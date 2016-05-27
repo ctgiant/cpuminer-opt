@@ -63,7 +63,10 @@ void Transform(hashState_groestl *ctx,
       TF1024((u64*)ctx->chaining, (u64*)in);
 #endif
 
-    asm volatile ("emms");
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+    __asm__ volatile("emms");
+#else
+	asm volatile ("emms");
 }
 
 /* given state h, do h <- P(h)+h */
@@ -75,7 +78,10 @@ void OutputTransformation(hashState_groestl *ctx) {
     OF1024((u64*)ctx->chaining);
 #endif
 
-    asm volatile ("emms");
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+    __asm__ volatile("emms");
+#else
+	asm volatile ("emms");
 }
 
 /* initialise context */

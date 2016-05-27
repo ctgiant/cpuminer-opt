@@ -10,6 +10,9 @@
 #define __hash_h
 
 #include <stdio.h>
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+#include <windows.h>
+#endif
 #include <stdlib.h>
 
 /* eBash API begin */
@@ -24,7 +27,7 @@ typedef crypto_uint8 u8;
 typedef crypto_uint32 u32;
 typedef crypto_uint64 u64;
 #endif
- * /
+ */
 /* eBash API end */
 
 #define LENGTH (512)

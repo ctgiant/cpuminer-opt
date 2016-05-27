@@ -190,7 +190,10 @@ static void x14hash(void *output, const void *input)
 	sph_shabal512_close(&ctx.shabal, hash);
 
 
-        asm volatile ("emms");
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+    	__asm__ volatile("emms");
+#else
+		asm volatile ("emms");
 	memcpy(output, hash, 32);
 }
 

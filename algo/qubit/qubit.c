@@ -94,7 +94,10 @@ void qubithash(void *output, const void *input)
         final_echo( &ctx.echo, (BitSequence *) hash);
 #endif
 
-        asm volatile ("emms");
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+    	__asm__ volatile("emms");
+#else
+		asm volatile ("emms");
         memcpy(output, hash, 32);
 }
 

@@ -287,7 +287,6 @@ bool register_algo_gate( int algo, algo_gate_t *gate )
      case ALGO_GROESTL:     register_groestl_algo    ( gate ); break;
      case ALGO_HEAVY:       register_heavy_algo      ( gate ); break;
      case ALGO_HMQ1725:     register_hmq1725_algo    ( gate ); break;
-     case ALGO_HODL:        register_hodl_algo       ( gate ); break;
      case ALGO_KECCAK:      register_keccak_algo     ( gate ); break;
      case ALGO_LUFFA:       register_luffa_algo      ( gate ); break;
      case ALGO_LYRA2RE:     register_lyra2re_algo    ( gate ); break;

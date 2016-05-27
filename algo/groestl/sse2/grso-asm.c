@@ -3,7 +3,7 @@
 #include "grso-asm.h"
 
 void grsoP1024ASM (u64 *x) {
-  asm (
+  __asm__ (
        "\n	movq	8(%0), %%rcx"
        "\n	movq	24(%0), %%rdx"
        "\n	movq	$0, 8(%0)"
@@ -511,14 +511,14 @@ void grsoP1024ASM (u64 *x) {
        "\n	movq	%%r13, 104(%0)"
        "\n	movq	%%r14, 112(%0)"
        "\n	movq	%%r15, 120(%0)"
-       : /*no output, only memory is modified */
+       : /*no output, only memory is modified */ 
        : "r"(x)
        : "%rax", "%rbx", "%rcx", "%rdx", "%rdi", "%rsi", "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15", "memory" , "%mm0", "%mm1", "%mm2" , "%mm3" , "%mm4" , "%mm5" , "%mm6" , "%mm7" );
 }//P512ASM()
 
 
 void grsoQ1024ASM (u64 *x) {
-  asm (
+  __asm__ (
        "\n	movq	8(%0), %%rcx"
        "\n	movq	24(%0), %%rdx"
        "\n	movq	$0, 8(%0)"

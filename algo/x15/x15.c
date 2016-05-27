@@ -193,7 +193,10 @@ static void x15hash(void *output, const void *input)
 	sph_whirlpool_close(&ctx.whirlpool, hashB);
 
 
-        asm volatile ("emms");
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+    	__asm__ volatile("emms");
+#else
+		asm volatile ("emms");
 	memcpy(output, hashB, 32);
 }
 

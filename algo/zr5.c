@@ -148,6 +148,9 @@ static const int arrOrder[][4] =
            break;
        }
     }
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+    __asm__ volatile("emms");
+#else
 	asm volatile ("emms");
 	memcpy(state, hash, 32);
 }

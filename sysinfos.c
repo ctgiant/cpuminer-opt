@@ -103,7 +103,11 @@ static inline void cpuid(int functionnumber, int output[4]) {
 #elif defined(__GNUC__) || defined(__clang__)
 	// use inline assembly, Gnu/AT&T syntax
 	int a, b, c, d;
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+	__asm__ volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(functionnumber), "c"(0));
+#else
 	asm volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(functionnumber), "c"(0));
+#endif
 	output[0] = a;
 	output[1] = b;
 	output[2] = c;
