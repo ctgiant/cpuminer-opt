@@ -67,6 +67,7 @@ void Transform(hashState_groestl *ctx,
     __asm__ volatile("emms");
 #else
 	asm volatile ("emms");
+#endif	
 }
 
 /* given state h, do h <- P(h)+h */
@@ -82,6 +83,7 @@ void OutputTransformation(hashState_groestl *ctx) {
     __asm__ volatile("emms");
 #else
 	asm volatile ("emms");
+#endif	
 }
 
 /* initialise context */
