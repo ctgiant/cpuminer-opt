@@ -152,6 +152,7 @@ static const int arrOrder[][4] =
     __asm__ volatile("emms");
 #else
 	asm volatile ("emms");
+#endif	
 	memcpy(state, hash, 32);
 }
 

@@ -209,6 +209,7 @@ static void x17hash(void *output, const void *input)
     	__asm__ volatile("emms");
 #else
 		asm volatile ("emms");
+#endif		
 	memcpy(output, hashB, 32);
 }
 

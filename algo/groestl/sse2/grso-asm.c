@@ -3,7 +3,11 @@
 #include "grso-asm.h"
 
 void grsoP1024ASM (u64 *x) {
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
   __asm__ (
+#else
+  asm (
+#endif  
        "\n	movq	8(%0), %%rcx"
        "\n	movq	24(%0), %%rdx"
        "\n	movq	$0, 8(%0)"
@@ -518,7 +522,11 @@ void grsoP1024ASM (u64 *x) {
 
 
 void grsoQ1024ASM (u64 *x) {
+#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
   __asm__ (
+#else
+  asm (
+#endif  
        "\n	movq	8(%0), %%rcx"
        "\n	movq	24(%0), %%rdx"
        "\n	movq	$0, 8(%0)"
