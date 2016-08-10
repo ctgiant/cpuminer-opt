@@ -58,6 +58,9 @@ libcurl-devel and an development packages are required to be
 installed to build this application and are available in most
 Linux repositories.
 
+To compile on older CPUs without AES_NI support use the following
+CFLAGS options: "-O3 -march=native -DNO_AES_NI"
+
 Bugs
 ----
 

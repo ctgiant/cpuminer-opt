@@ -43,15 +43,11 @@ int scanhash_skein(int thr_id, struct work *work,
         uint32_t *ptarget = work->target;
 	uint32_t _ALIGN(64) hash64[8];
 	uint32_t _ALIGN(64) endiandata[20];
-
 	const uint32_t Htarg = ptarget[7];
 	const uint32_t first_nonce = pdata[19];
-
 	uint32_t n = first_nonce;
 	
-	for (int i=0; i < 19; i++) {
-		be32enc(&endiandata[i], pdata[i]);
-	};
+        swab32_array( endiandata, pdata, 20 );
 
 	do {
 		be32enc(&endiandata[19], n); 

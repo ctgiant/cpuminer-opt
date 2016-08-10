@@ -80,10 +80,25 @@ cpuminer_SOURCES = \
   algo/groestl/sse2/grso.c\
   algo/groestl/sse2/grso-asm.c\
   algo/groestl/aes_ni/hash-groestl.c \
+  algo/groestl/aes_ni/hash-groestl256.c \
   algo/haval/haval.c\
   algo/heavy/heavy.c \
   algo/heavy/bastion.c \
   algo/hmq1725.c \
+  algo/hodl/hodl.cpp \
+  algo/hodl/hodl-gate.c \
+  algo/hodl/hodl_arith_uint256.cpp \
+  algo/hodl/hodl_uint256.cpp \
+  algo/hodl/hash.cpp \
+  algo/hodl/hmac_sha512.cpp \
+  algo/hodl/sha256.cpp \
+  algo/hodl/sha512.cpp \
+  algo/hodl/utilstrencodings.cpp \
+  algo/hodl/hodl-wolf.c \
+  algo/hodl/aes.c \
+  algo/hodl/sha512_avx.c \
+  algo/hodl/sha512_avx2.c \
+  algo/lbry.c \
   algo/luffa/luffa.c \
   algo/luffa/sse2/luffa_for_sse2.c \
   algo/lyra2/lyra2.c \
@@ -107,7 +122,10 @@ cpuminer_SOURCES = \
   algo/skein/skein2.c \
   algo/s3.c \
   algo/tiger/sph_tiger.c \
+  algo/whirlpool/whirlpool.c \
+  algo/whirlpool/whirlpoolx.c \
   algo/x11/x11.c \
+  algo/x11/x11evo.c \
   algo/x11/x11gost.c \
   algo/x11/c11.c \
   algo/x13/x13.c \
@@ -119,9 +137,6 @@ cpuminer_SOURCES = \
   algo/yescrypt/sha256_Y.c\
   algo/yescrypt/yescrypt-simd.c\
   algo/zr5.c
-
-
-
 
 
 disable_flags =

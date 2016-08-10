@@ -761,7 +761,7 @@ void
 sph_hamsi224_close(void *cc, void *dst)
 {
 	hamsi_small_close(cc, 0, 0, dst, 7);
-	hamsi_small_init(cc, IV224);
+//	hamsi_small_init(cc, IV224);
 }
 
 /* see sph_hamsi.h */
@@ -769,7 +769,7 @@ void
 sph_hamsi224_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	hamsi_small_close(cc, ub, n, dst, 7);
-	hamsi_small_init(cc, IV224);
+//	hamsi_small_init(cc, IV224);
 }
 
 /* see sph_hamsi.h */
@@ -791,7 +791,7 @@ void
 sph_hamsi256_close(void *cc, void *dst)
 {
 	hamsi_small_close(cc, 0, 0, dst, 8);
-	hamsi_small_init(cc, IV256);
+//	hamsi_small_init(cc, IV256);
 }
 
 /* see sph_hamsi.h */
@@ -799,7 +799,7 @@ void
 sph_hamsi256_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	hamsi_small_close(cc, ub, n, dst, 8);
-	hamsi_small_init(cc, IV256);
+//	hamsi_small_init(cc, IV256);
 }
 
 /* see sph_hamsi.h */
@@ -821,7 +821,7 @@ void
 sph_hamsi384_close(void *cc, void *dst)
 {
 	hamsi_big_close(cc, 0, 0, dst, 12);
-	hamsi_big_init(cc, IV384);
+//	hamsi_big_init(cc, IV384);
 }
 
 /* see sph_hamsi.h */
@@ -829,7 +829,7 @@ void
 sph_hamsi384_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	hamsi_big_close(cc, ub, n, dst, 12);
-	hamsi_big_init(cc, IV384);
+//	hamsi_big_init(cc, IV384);
 }
 
 /* see sph_hamsi.h */
@@ -851,7 +851,7 @@ void
 sph_hamsi512_close(void *cc, void *dst)
 {
 	hamsi_big_close(cc, 0, 0, dst, 16);
-	hamsi_big_init(cc, IV512);
+//	hamsi_big_init(cc, IV512);
 }
 
 /* see sph_hamsi.h */
@@ -859,7 +859,7 @@ void
 sph_hamsi512_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	hamsi_big_close(cc, ub, n, dst, 16);
-	hamsi_big_init(cc, IV512);
+//	hamsi_big_init(cc, IV512);
 }
 
 #ifdef __cplusplus

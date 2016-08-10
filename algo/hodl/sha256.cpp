@@ -3,9 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "sha256.h"
-
 #include "common.h"
-
 #include <string.h>
 
 // Internal implementation code.

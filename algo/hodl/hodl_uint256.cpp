@@ -4,9 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "hodl_uint256.h"
-
 #include "utilstrencodings.h"
-
 #include <stdio.h>
 #include <string.h>
 
@@ -144,3 +142,4 @@ uint64_t uint256::GetHash(const uint256& salt) const
 
     return ((((uint64_t)b) << 32) | c);
 }
+

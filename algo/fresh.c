@@ -80,9 +80,9 @@ int scanhash_fresh(int thr_id, struct work *work,
 	};
 
 	// we need bigendian data...
-	for (int kk=0; kk < 32; kk++) {
-		be32enc(&endiandata[kk], ((uint32_t*)pdata)[kk]);
-	};
+        for (int k = 0; k < 19; k++)
+                be32enc(&endiandata[k], pdata[k]);
+
 #ifdef DEBUG_ALGO
 	if (Htarg != 0)
 		printf("[%d] Htarg=%X\n", thr_id, Htarg);

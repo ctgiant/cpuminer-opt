@@ -133,6 +133,7 @@ uint32_t rpc2_target = 0;
 char *rpc2_job_id = NULL;
 double opt_diff_factor = 1.0;
 uint32_t zr5_pok = 0;
+bool opt_stratum_stats = true;
 
 uint32_t accepted_count = 0L;
 uint32_t rejected_count = 0L;
@@ -241,6 +242,11 @@ void proper_exit(int reason)
 	}
 #endif
 	exit(reason);
+}
+
+uint32_t* get_stratum_job_ntime()
+{
+   return (uint32_t*)stratum.job.ntime;
 }
 
 void work_free(struct work *w)
@@ -709,8 +715,11 @@ static int share_result( int result, struct work *work, const char *reason )
    const char *sres;
    double hashcount = 0.;
    double hashrate = 0.;
-   char hc_units = 0;
-   char hr_units = 0;
+   char hc_units[4] = {0};
+   char hr_units[4] = {0};
+   uint32_t total_submits;
+   float accepted_rate;
+   char accepted_rate_s[8] = {0};
    int i;
 
    pthread_mutex_lock(&stats_lock);
@@ -723,21 +732,30 @@ static int share_result( int result, struct work *work, const char *reason )
    pthread_mutex_unlock(&stats_lock);
    global_hashcount = hashcount;
    global_hashrate = hashrate;
+   total_submits = accepted_count + rejected_count;
+   accepted_rate = 100. * accepted_count / total_submits;
    if (use_colors)
-	sres = (result ? CL_GRN "yes!" : CL_RED "nooooo");
+	sres = (result ? CL_GRN "yes!" CL_N : CL_RED "nooooo" CL_N );
    else
 	sres = (result ? "(yes!!!)" : "(nooooo)");
-   scale_hash_for_display ( &hashcount, &hc_units );
-   scale_hash_for_display ( &hashrate, &hr_units );
-   if ( hc_units )
+   if ( accepted_rate == 100.0 )
+      sprintf( accepted_rate_s, "%.0f", accepted_rate );
+   else
+       // non-zero rejects, add decimal place but prevent displaying 100.0% due
+       // to rounding up
+       sprintf( accepted_rate_s, "%.1f", ( accepted_rate < 99.9 )
+                                           ? accepted_rate : 99.9 );
+
+   scale_hash_for_display ( &hashcount, hc_units );
+   scale_hash_for_display ( &hashrate, hr_units );
+   if ( hc_units[0] )
       sprintf(hc, "%.2f", hashcount );
    else
       // no fractions of a hash
       sprintf(hc, "%.0f", hashcount );
    sprintf(hr, "%.2f", hashrate );
-   applog(LOG_NOTICE, "accepted: %lu/%lu (%.0f%%), %s %cH, %s %cH/s %s",
-              accepted_count, accepted_count + rejected_count,
-              100. * accepted_count / (accepted_count + rejected_count),
+   applog(LOG_NOTICE, "accepted: %lu/%lu (%s%%), %s %sH, %s %sH/s %s",
+              accepted_count, total_submits, accepted_rate_s,
               hc, hc_units, hr, hr_units, sres );
    if (reason)
    {
@@ -755,12 +773,12 @@ static int share_result( int result, struct work *work, const char *reason )
 // le is default
 void std_be_build_stratum_request( char *req, struct work *work )
 {
-   const int ntime_i = 17;
+//   const int ntime_i = 17;
    unsigned char *xnonce2str;
    uint32_t ntime,       nonce;
    char     ntimestr[9], noncestr[9];
-   be32enc( &ntime, work->data[ ntime_i ] );
-   be32enc( &nonce, *( algo_gate.get_nonceptr( work->data ) ) );
+   be32enc( &ntime, work->data[ algo_gate.ntime_index ] );
+   be32enc( &nonce, work->data[ algo_gate.nonce_index ] );
    bin2hex( ntimestr, (char*)(&ntime), sizeof(uint32_t) );
    bin2hex( noncestr, (char*)(&nonce), sizeof(uint32_t) );
    xnonce2str = abin2hex(work->xnonce2, work->xnonce2_len);
@@ -772,12 +790,12 @@ void std_be_build_stratum_request( char *req, struct work *work )
 
 void std_le_build_stratum_request( char *req, struct work *work )
 {
-   const int ntime_i = 17;   
+//   const int ntime_i = 17;   
    unsigned char *xnonce2str;
    uint32_t ntime,       nonce;
    char     ntimestr[9], noncestr[9];
-   le32enc( &ntime, work->data[ ntime_i ] );
-   le32enc( &nonce, *( algo_gate.get_nonceptr( work->data ) ) );
+   le32enc( &ntime, work->data[ algo_gate.ntime_index ] );
+   le32enc( &nonce, work->data[ algo_gate.nonce_index ] );
    bin2hex( ntimestr, (char*)(&ntime), sizeof(uint32_t) );
    bin2hex( noncestr, (char*)(&nonce), sizeof(uint32_t) );
    xnonce2str = abin2hex(work->xnonce2, work->xnonce2_len);
@@ -803,7 +821,7 @@ void jr2_build_stratum_request( char *req, struct work *work )
 
 bool jr2_submit_getwork_result( CURL *curl, struct work *work )
 {
-   json_t *val, *res, *reason;
+   json_t *val, *res;
    char req[JSON_BUF_LEN];
    char noncestr[9];
    uchar hash[32];
@@ -883,10 +901,10 @@ bool std_submit_getwork_result( CURL *curl, struct work *work )
 
 static bool submit_upstream_work( CURL *curl, struct work *work )
 {
-   json_t *val, *res, *reason;
+   json_t *val, *res;
    char req[JSON_BUF_LEN];
    int i;
-   bool rc = false;
+//   bool rc = false;
 
    /* pass if the previous hash is not the current previous hash */
    if ( !submit_old && memcmp( &work->data[1], &g_work.data[1], 32 ) )
@@ -908,14 +926,13 @@ static bool submit_upstream_work( CURL *curl, struct work *work )
    }
    if ( have_stratum )
    {
-       uint32_t ntime, nonce;
-       char ntimestr[9], noncestr[9];
        algo_gate.build_stratum_request( req, work, &stratum );
        if ( unlikely( !stratum_send_line( &stratum, req ) ) )
        {
           applog(LOG_ERR, "submit_upstream_work stratum_send_line failed");
-       return false;
+          return false;
        }
+       return true;
    }
    else if (work->txs)
    {
@@ -1325,7 +1342,7 @@ void std_stratum_gen_work( struct stratum_ctx *sctx, struct work *work,
    /* Increment extranonce2 */
    for ( t = 0; t < sctx->xnonce2_size && !( ++sctx->job.xnonce2[t] ); t++ );
    /* Assemble block header */
-   memset( work->data, 0, algo_gate.work_data_size );
+   memset( work->data, 0, sizeof(work->data) );
    work->data[0] = le32dec( sctx->job.version );
    for ( i = 0; i < 8; i++ )
       work->data[1 + i] = le32dec( (uint32_t *) sctx->job.prevhash + i );
@@ -1425,24 +1442,22 @@ static bool wanna_mine(int thr_id)
 
 bool std_gen_work_now( int thr_id, struct work *work, struct work *g_work )
 {
-   const int wkcmp_sz = 76;  // nonce_index * sizeof(uint32_t);
+//   const int wkcmp_sz = 76;  // nonce_index * sizeof(uint32_t);
    uint32_t end_nonce = 0xffffffffU / opt_n_threads * (thr_id + 1) - 0x20;
-   return ( ( *(algo_gate.get_nonceptr( work->data ) ) >= end_nonce )
-            && !( memcmp( work->data, g_work->data, wkcmp_sz ) ) );
+   return ( work->data[ algo_gate.nonce_index ] >= end_nonce )
+            && !( memcmp( work->data, g_work->data, algo_gate.work_cmp_size ) );
 }
 
 bool jr2_gen_work_now( int thr_id, struct work *work, struct work *g_work )
 {
-// const int wkcmp_sz         = 76;   
-   const int nonce_byte_i = 39;
-   const int wkcmp2_i     = 43;  // nonce_byte_index + sizeof(uint32_t)
-   const int wkcmp2_sz    = 33;  // wkcmp_sz - wkcmp2-index
+   const int nonce_byte_index = algo_gate.nonce_index;
    uint32_t end_nonce = 0xffffffffU / opt_n_threads * (thr_id + 1) - 0x20;
-   // byte data[ 0..38, 43..75 ], skip over misaligned nonce
-   return ( *(algo_gate.get_nonceptr( work->data ) ) >= end_nonce
-         && !(   memcmp( work->data, g_work->data, nonce_byte_i )
-             ||  memcmp( ((uint8_t*) work->data)   + wkcmp2_i,
-                         ((uint8_t*) g_work->data) + wkcmp2_i, wkcmp2_sz ) ) );
+   // byte data[ 0..38, 43..75 ], skip over misaligned nonce [39..42]
+   return ( work->data[ nonce_byte_index ] >= end_nonce )
+         && !(   memcmp( work->data, g_work->data, nonce_byte_index )
+             ||  memcmp( ((uint8_t*) work->data)   + JR2_WORK_CMP_INDEX_2,
+                         ((uint8_t*) g_work->data) + JR2_WORK_CMP_INDEX_2,
+                                                       JR2_WORK_CMP_SIZE_2 ) );
 }
 
 static void *miner_thread( void *userdata )
@@ -1514,7 +1529,7 @@ static void *miner_thread( void *userdata )
 	 affine_to_cpu_mask(thr_id, (unsigned long)opt_affinity);
       }
    }
-   // alloc buffer and/or return buffer pointer
+   // no longer used by hodl, other algos allloc buf per thread
    if ( !algo_gate.alloc_scratchbuf( &scratchbuf ) )
    {
       applog(LOG_ERR, "%s buffer allocation failed", algo_names[opt_algo] );
@@ -1613,7 +1628,7 @@ static void *miner_thread( void *userdata )
           if (remain < max64) max64 = remain;
        }
        // max64
-       uint32_t work_nonce = *( algo_gate.get_nonceptr( work.data ) );
+       uint32_t work_nonce = *(algo_gate.get_nonceptr( work.data ) );
        max64 *= thr_hashrates[thr_id];
        if ( max64 <= 0)
           max64 = (int64_t)algo_gate.get_max64();
@@ -1627,7 +1642,7 @@ static void *miner_thread( void *userdata )
        work_restart[thr_id].restart = 0;
        hashes_done = 0;
        gettimeofday((struct timeval *) &tv_start, NULL);
- 
+
        // Scanhash
        rc = (int) algo_gate.scanhash( thr_id, &work, max_nonce, &hashes_done,
                                       scratchbuf );
@@ -1663,20 +1678,20 @@ static void *miner_thread( void *userdata )
        {
           char hc[16];
           char hr[16];
-          char hc_units = 0;
-          char hr_units = 0;
+          char hc_units[2] = {0,0};
+          char hr_units[2] = {0,0};
           double hashcount = thr_hashcount[thr_id];
           double hashrate  = thr_hashrates[thr_id];
           if ( hashcount )
           {
-             scale_hash_for_display( &hashcount, &hc_units );
-             scale_hash_for_display( &hashrate,  &hr_units );
-             if ( hc_units )
+             scale_hash_for_display( &hashcount, hc_units );
+             scale_hash_for_display( &hashrate,  hr_units );
+             if ( hc_units[0] )
                 sprintf( hc, "%.2f", hashcount );
              else // no fractions of a hash
                 sprintf( hc, "%.0f", hashcount );
              sprintf( hr, "%.2f", hashrate );
-             applog( LOG_INFO, "CPU #%d: %s %cH, %s %cH/s",
+             applog( LOG_INFO, "CPU #%d: %s %sH, %s %sH/s",
                                thr_id, hc, hc_units, hr, hr_units );
           }
        }
@@ -1693,19 +1708,19 @@ static void *miner_thread( void *userdata )
           if ( hashcount )
           {
              char hc[16];
-             char hc_units = 0;
+             char hc_units[2] = {0,0};
              char hr[16];
-             char hr_units = 0;
+             char hr_units[2] = {0,0};
              global_hashcount = hashcount;
              global_hashrate  = hashrate;
-             scale_hash_for_display( &hashcount, &hc_units );
-             scale_hash_for_display( &hashrate,  &hr_units );
-             if ( hc_units )
+             scale_hash_for_display( &hashcount, hc_units );
+             scale_hash_for_display( &hashrate,  hr_units );
+             if ( hc_units[0] )
                 sprintf( hc, "%.2f", hashcount );
              else  // no fractions of a hash
                 sprintf( hc, "%.0f", hashcount );
              sprintf( hr, "%.2f", hashrate );
-             applog( LOG_NOTICE, "Total: %s %cH, %s %cH/s",
+             applog( LOG_NOTICE, "Total: %s %sH, %s %sH/s",
                                   hc, hc_units, hr, hr_units );
           }
        }
@@ -1802,7 +1817,6 @@ start:
 
    while (1)
    {
-      char *req = NULL;
       int err;
       json_t *val;
       val = (json_t*)algo_gate.longpoll_rpc_call( curl, &err, lp_url );
@@ -1903,15 +1917,15 @@ bool std_stratum_handle_response( json_t *val )
     valid = json_is_true( res_val );
     share_result( valid, NULL, err_val ?
                   json_string_value( json_array_get(err_val, 1) ) : NULL );
+    return true;
 }
 
 bool jr2_stratum_handle_response( json_t *val )
 {
     bool valid = false;
-    json_t *err_val, *res_val, *id_val;
+    json_t *err_val, *res_val;
     res_val = json_object_get( val, "result" );
     err_val = json_object_get( val, "error" );
-    id_val  = json_object_get( val, "id" );
 
     if ( !res_val && !err_val )
         return false;
@@ -1924,14 +1938,14 @@ bool jr2_stratum_handle_response( json_t *val )
     else
         valid = json_is_null( err_val );
     share_result( valid, NULL, err_val ? json_string_value(err_val) : NULL );
+    return true;
 }
 
 static bool stratum_handle_response( char *buf )
 {
-	json_t *val, *err_val, *res_val, *id_val;
+	json_t *val, *res_val, *id_val;
 	json_error_t err;
 	bool ret = false;
-	bool valid = false;
 
 	val = JSON_LOADS( buf, &err );
 	if (!val)
@@ -1940,7 +1954,6 @@ static bool stratum_handle_response( char *buf )
 	   goto out;
 	}
 	res_val = json_object_get( val, "result" );
-	err_val = json_object_get( val, "error" );
 	id_val = json_object_get( val, "id" );
 	if ( !id_val || json_is_null(id_val) )
 		goto out;
@@ -2058,62 +2071,63 @@ out:
 
 void show_version_and_exit(void)
 {
-	printf("\n built on " __DATE__
+        printf("\n built on " __DATE__
 #ifdef _MSC_VER
-	 " with VC++ 2013\n");
+         " with VC++ 2013\n");
 #elif defined(__GNUC__)
-	 " with GCC");
-	printf(" %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+         " with GCC");
+        printf(" %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
 #endif
 
-	printf(" features:"
+        printf(" features:"
 #if defined(USE_ASM) && defined(__i386__)
-		" i386"
+                " i386"
 #endif
 #if defined(USE_ASM) && defined(__x86_64__)
-		" x86_64"
+                " x86_64"
 #endif
 #if defined(USE_ASM) && (defined(__i386__) || defined(__x86_64__))
-		" SSE2"
+                " SSE2"
 #endif
 #if defined(__x86_64__) && defined(USE_AVX)
-		" AVX"
+                " AVX"
 #endif
 #if defined(__x86_64__) && defined(USE_AVX2)
-		" AVX2"
+                " AVX2"
 #endif
 #if defined(__x86_64__) && defined(USE_XOP)
-		" XOP"
+                " XOP"
 #endif
 #if defined(USE_ASM) && defined(__arm__) && defined(__APCS_32__)
-		" ARM"
+                " ARM"
 #if defined(__ARM_ARCH_5E__) || defined(__ARM_ARCH_5TE__) || \
-	defined(__ARM_ARCH_5TEJ__) || defined(__ARM_ARCH_6__) || \
-	defined(__ARM_ARCH_6J__) || defined(__ARM_ARCH_6K__) || \
-	defined(__ARM_ARCH_6M__) || defined(__ARM_ARCH_6T2__) || \
-	defined(__ARM_ARCH_6Z__) || defined(__ARM_ARCH_6ZK__) || \
-	defined(__ARM_ARCH_7__) || \
-	defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__) || \
-	defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__)
-		" ARMv5E"
+        defined(__ARM_ARCH_5TEJ__) || defined(__ARM_ARCH_6__) || \
+        defined(__ARM_ARCH_6J__) || defined(__ARM_ARCH_6K__) || \
+        defined(__ARM_ARCH_6M__) || defined(__ARM_ARCH_6T2__) || \
+        defined(__ARM_ARCH_6Z__) || defined(__ARM_ARCH_6ZK__) || \
+        defined(__ARM_ARCH_7__) || \
+        defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__) || \
+        defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__)
+                " ARMv5E"
 #endif
 #if defined(__ARM_NEON__)
-		" NEON"
+                " NEON"
 #endif
 #endif
-		"\n\n");
+                "\n\n");
 
-	/* dependencies versions */
-	printf("%s\n", curl_version());
+        /* dependencies versions */
+        printf("%s\n", curl_version());
 #ifdef JANSSON_VERSION
-	printf("jansson/%s ", JANSSON_VERSION);
+        printf("jansson/%s ", JANSSON_VERSION);
 #endif
 #ifdef PTW32_VERSION
-	printf("pthreads/%d.%d.%d.%d ", PTW32_VERSION);
+        printf("pthreads/%d.%d.%d.%d ", PTW32_VERSION);
 #endif
-	printf("\n");
-	exit(0);
+        printf("\n");
+        exit(0);
 }
+
 
 void show_usage_and_exit(int status)
 {
@@ -2581,138 +2595,113 @@ static void show_credits()
 {
 	printf("\n         **********  "PACKAGE_NAME" "PACKAGE_VERSION"  *********** \n");
         printf("     A CPU miner with multi algo support and optimized for CPUs\n");
-        printf("     with AES_NI extension.\n");
+        printf("     with AES_NI and AVX extensions.\n");
 	printf("     BTC donation address: 12tdvfF7KmAsihBXQXynT6E6th2c2pByTT\n");
         printf("     Forked from TPruvot's cpuminer-multi with credits\n");
         printf("     to Lucas Jones, elmad, palmd, djm34, pooler, ig0tik3d,\n");
-        printf("     Wolf0 and Jeff Garzik.\n\n");
+        printf("     Wolf0, Jeff Garzik and Optiminer.\n\n");
 }
 
 bool check_cpu_capability ()
 {
-     int cpu_id[4];
-     unsigned int nExIds;
-     char CPUBrandString[0x40];
-     bool cpu_has_aes  = has_aes_ni();
-     bool sw_has_aes   = false;
+     char cpu_brand[0x40];
      bool cpu_has_sse2 = has_sse2();
-     bool sw_has_sse2 = false;
-     bool algo_has_aes = algo_gate.aes_ni_optimized;
-     char* grn_yes = CL_GRN "YES." CL_N;
-     char* ylw_no  = CL_YLW "NO." CL_N;
-     char* red     = CL_RED;
-
-     if ( !use_colors )
-     {
-        grn_yes = "YES.";
-        ylw_no  = "NO.";
-        red     = 0;
-     }
-
-     // Get the information associated with each extended ID.
-     processor_id( 0x80000000, cpu_id );
-     nExIds = cpu_id[0];
-     for ( unsigned j = 0x80000000; j <= nExIds; ++j )
-     {
-       processor_id( j, cpu_id );
-       // Interpret CPU brand string
-       if ( j == 0x80000002 )
-         memcpy( CPUBrandString, cpu_id, sizeof(cpu_id) );
-       else if ( j == 0x80000003)
-          memcpy( CPUBrandString + 16, cpu_id, sizeof(cpu_id) );
-       else if ( j == 0x80000004)
-          memcpy( CPUBrandString + 32, cpu_id, sizeof(cpu_id) );
-     }
+     bool cpu_has_aes  = has_aes_ni();
+     bool cpu_has_avx  = has_avx1();
+     bool cpu_has_avx2 = has_avx2();
+     bool sw_has_sse2  = false;
+     bool sw_has_aes   = false;
+     bool sw_has_avx   = false;
+     bool sw_has_avx2  = false;
+//     bool algo_has_aes = algo_gate.aes_ni_optimized;
+     set_t algo_features = algo_gate.optimizations;
+     bool algo_has_aes = set_incl( AES_OPT, algo_features );
+     bool algo_has_avx = set_incl( AVX_OPT, algo_features );
+     bool algo_has_avx2 = set_incl( AVX2_OPT, algo_features );
+     bool use_aes;
+     bool use_sse2;
+     bool use_avx;
+     bool use_avx2;
 
      #ifdef __AES__
        sw_has_aes = true;
      #endif
      #ifdef __SSE2__
-       sw_has_sse2 = true;
+         sw_has_sse2 = true;
+     #endif
+     #ifdef __AVX__
+         sw_has_avx = true;;
+     #endif
+     #ifdef __AVX2__
+         sw_has_avx2 = true;
      #endif
 
-    void printf_mine_with_aes()
-        { printf("Start mining with AES_NI optimizations...\n\n"); }
-    void printf_mine_without_aes()
-        { printf("Starting mining without AES_NI optimizations...\n\n"); }
-    void printf_bad_cpu()
-        { printf("%sUnsupported CPU architecture, requires SSE2 minimum.%s\n",red,CL_N); }
-    void printf_bad_build()
-        { printf("%sIncompatible SW build, rebuild with \"-march=native\"%s\n",red,CL_N); }
-    void printf_rebuild_for_faster()
-        { printf("CPU and algo support AES_NI, but SW build does not.\n");
-          printf("Rebuild with \"-march=native\" for better performance.\n"); } 
+     #if !((__AES__) || (__SSE2__))
+         printf("Neither __AES__ nor __SSE2__ defined.\n");
+     #endif
 
+     cpu_brand_string( cpu_brand );
+     printf( "CPU: %s\n", cpu_brand );
+     
+     printf("CPU features:");
+     if ( cpu_has_sse2 ) printf( " SSE2" );
+     if ( cpu_has_aes  ) printf( " AES"  );
+     if ( cpu_has_avx  ) printf( " AVX"  );
+     if ( cpu_has_avx2 ) printf( " AVX2" );
 
-     printf("Checking CPU capatibility...\n");
-     printf( "        %s\n", CPUBrandString );
+     printf("\nSW built on " __DATE__
+     #ifdef _MSC_VER
+         " with VC++ 2013\n");
+     #elif defined(__GNUC__)
+         " with GCC");
+        printf(" %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+     #else
+        printf("\n");
+     #endif
 
-     printf("   CPU arch supports AES_NI...");
-     if ( cpu_has_aes )
+     printf("SW features:");
+     if ( sw_has_sse2 ) printf( " SSE2" );
+     if ( sw_has_aes  ) printf( " AES"  );
+     if ( sw_has_avx  ) printf( " AVX"  );
+     if ( sw_has_avx2 ) printf( " AVX2" );
+
+     // SSE2 defaults to yes regardless
+     printf("\nAlgo features: SSE2");
+     if ( algo_has_aes ) printf( " AES" );
+     if ( algo_has_avx ) printf( " AVX" );
+     if ( algo_has_avx2 ) printf( " AVX2" );
+     printf("\n");
+
+//     printf("\nAlgo features: %s\n", algo_has_aes ? "SSE2 AES" : "SSE2" );
+
+     use_aes = cpu_has_aes && sw_has_aes && algo_has_aes;
+     // don't use AES algo on non-AES CPU if compiled with AES.
+     use_sse2 = cpu_has_sse2 && sw_has_sse2 && !( sw_has_aes && algo_has_aes );
+     use_avx = use_aes && cpu_has_avx && sw_has_avx && algo_has_avx;
+     use_avx2 = use_avx && cpu_has_avx2 && sw_has_avx2 && algo_has_avx2;
+
+     if ( use_sse2 )
+        printf( "AES not available, starting mining with SSE2 optimizations...\n\n" );
+     else if ( use_aes )
      {
-        printf("%s\n", grn_yes );
-        printf("   SW built for AES_NI........");
-        if ( sw_has_aes )
+        printf( "Start mining with SSE2 AES" );
+        if ( use_avx )
         {
-            printf("%s\n", grn_yes);
-            printf("   Algo supports AES_NI.......");
-            if ( algo_has_aes )
-            {
-               printf("%s\n", grn_yes);
-               printf_mine_with_aes();
-               return true;
-            }
-            else
-            {
-              printf("%s\n", ylw_no );
-              printf_mine_without_aes();
-              return true;
-            }
-         }
-         else  // !sw_has_aes
-         {
-            printf("%s\n", ylw_no );
-            if ( algo_has_aes )
-            {
-               printf("   Algo supports AES_NI.......");
-               printf("%s\n", grn_yes);
-               printf_rebuild_for_faster();
-            }
-         printf_mine_without_aes();
-         return true;
-         }
-      }
-      else  // !cpu_has_aes
-      {
-         printf("%s\n", ylw_no );
-         // make sure CPU has at least SSE2
-         printf("   CPU arch supports SSE2.....");
-         if ( cpu_has_sse2 )
-         {
-            printf("%s\n", grn_yes );
-            printf("   SW built for SSE2..........");
-            if ( sw_has_aes )
-            {
-              printf("%s\n", ylw_no );
-              printf_bad_build();
-              return false;
-            }
-            else
-            {
-// check for SW build below SSE2 is unrealiable and has been removed,
-                printf("%s\n", grn_yes );
-                printf_mine_without_aes();
-                return true;
-            }
-         }            
-         else            
-         {
-            printf("%s\n", ylw_no );
-            printf_bad_cpu();
-            return false;
-         }
-      }
-// never get here
+           printf( " AVX" );
+           if ( use_avx2 )
+              printf( " AVX2");
+        }
+        printf( "\n\n" );
+     }
+    
+//     if ( use_aes )
+//        printf( "Start mining with AES-AVX optimizations...\n\n" );
+//     else if ( use_sse2 )
+//        printf( "AES not available, starting mining with SSE2 optimizations...\n\n" );
+     else
+        printf( CL_RED "Unsupported CPU or SW configuration, miner will likely crash!\n\n" CL_N );
+
+     return true;
 }
 
 void get_defconfig_path(char *out, size_t bufsize, char *argv0);
@@ -2863,6 +2852,7 @@ int main(int argc, char *argv[])
 			applog(LOG_DEBUG, "Binding process to cpu mask %x", opt_affinity);
 		affine_to_cpu_mask(-1, (unsigned long)opt_affinity);
 	}
+
 
 //#ifdef HAVE_SYSLOG_H
 //	if (use_syslog)

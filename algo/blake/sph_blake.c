@@ -1028,7 +1028,7 @@ void
 sph_blake224_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	blake32_close(cc, ub, n, dst, 7);
-	sph_blake224_init(cc);
+//	sph_blake224_init(cc);
 }
 
 /* see sph_blake.h */
@@ -1057,7 +1057,7 @@ void
 sph_blake256_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	blake32_close(cc, ub, n, dst, 8);
-	sph_blake256_init(cc);
+//	sph_blake256_init(cc);
 }
 
 #if SPH_64
@@ -1088,7 +1088,7 @@ void
 sph_blake384_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	blake64_close(cc, ub, n, dst, 6);
-	sph_blake384_init(cc);
+//	sph_blake384_init(cc);
 }
 
 /* see sph_blake.h */
@@ -1117,7 +1117,7 @@ void
 sph_blake512_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	blake64_close(cc, ub, n, dst, 8);
-	sph_blake512_init(cc);
+//	sph_blake512_init(cc);
 }
 
 #endif

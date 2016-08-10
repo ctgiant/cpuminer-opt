@@ -5,34 +5,70 @@
 #if defined(OPTIMIZE_SSE2)
 #include <emmintrin.h>
 #endif
-
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
 #include "cubehash_sse2.h"
 #include "algo/sha3/sha3-defs.h"
 
 //enum { SUCCESS = 0, FAIL = 1, BAD_HASHBITLEN = 2 };
 
-#if defined(OPTIMIZE_SSE2)
+//#if defined(OPTIMIZE_SSE2)
 
-static inline void transform(cubehashParam *sp)
+static inline void transform( cubehashParam *sp )
 {
     int r;
-    __m128i x0;
-    __m128i x1;
-    __m128i x2;
-    __m128i x3;
-    __m128i x4;
-    __m128i x5;
-    __m128i x6;
-    __m128i x7;
-    __m128i y0;
-    __m128i y1;
-    __m128i y2;
-    __m128i y3;
+
+#ifdef __AVX2__
+
+    __m256i x0, x1, x2, x3, y0, y1;
+#ifdef  UNUSED
+    __m256i y2, y3;
+#endif
+
+    x0 = _mm256_load_si256( 0 + sp->x );
+    x1 = _mm256_load_si256( 2 + sp->x );   
+    x2 = _mm256_load_si256( 4 + sp->x );
+    x3 = _mm256_load_si256( 6 + sp->x );
+
+    for ( r = 0; r < sp->rounds; ++r )
+    { 
+        x2 = _mm256_add_epi32( x0, x2 );
+        x3 = _mm256_add_epi32( x1, x3 );
+        y0 = x1;
+        y1 = x0;
+        x0 = _mm256_xor_si256( _mm256_slli_epi32( y0, 7 ),
+                               _mm256_srli_epi32( y0, 25 ) );
+        x1 = _mm256_xor_si256( _mm256_slli_epi32( y1, 7 ),
+                               _mm256_srli_epi32( y1, 25 ) );
+        x0 = _mm256_xor_si256( x0, x2 );
+        x1 = _mm256_xor_si256( x1, x3 );
+        x2 = _mm256_shuffle_epi32( x2, 0x4e );
+        x3 = _mm256_shuffle_epi32( x3, 0x4e );
+        x2 = _mm256_add_epi32( x0, x2 );
+        x3 = _mm256_add_epi32( x1, x3 );
+        y0 = _mm256_permute2f128_si256( x0, x0, 1 );
+        y1 = _mm256_permute2f128_si256( x1, x1, 1 );
+        x0 = _mm256_xor_si256( _mm256_slli_epi32( y0, 11 ),
+                               _mm256_srli_epi32( y0, 21 ) );
+        x1 = _mm256_xor_si256( _mm256_slli_epi32( y1, 11 ), 
+                               _mm256_srli_epi32( y1, 21 ) );
+        x0 = _mm256_xor_si256( x0, x2 );
+        x1 = _mm256_xor_si256( x1, x3 );
+        x2 = _mm256_shuffle_epi32( x2, 0xb1 );
+        x3 = _mm256_shuffle_epi32( x3, 0xb1 );
+    }
+
+    _mm256_store_si256( 0 + sp->x, x0 );
+    _mm256_store_si256( 2 + sp->x, x1 );
+    _mm256_store_si256( 4 + sp->x, x2 );
+    _mm256_store_si256( 6 + sp->x, x3 );
+
+#elif defined OPTIMIZE_SSE2
+
+    __m128i x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3;
 #ifdef	UNUSED
-    __m128i y4;
-    __m128i y5;
-    __m128i y6;
-    __m128i y7;
+    __m128i y4, y5, y6, y7;
 #endif
 
     x0 = _mm_load_si128(0 + sp->x);
@@ -95,17 +131,14 @@ static inline void transform(cubehashParam *sp)
     _mm_store_si128(5 + sp->x, x5);
     _mm_store_si128(6 + sp->x, x6);
     _mm_store_si128(7 + sp->x, x7);
-}
 
 #else	/* OPTIMIZE_SSE2 */
+// Tis code probably not used, sph used instead for uniptoimized mining.
 
 #define ROTATE(a,b) (((a) << (b)) | ((a) >> (32 - b)))
 
-static inline void transform(cubehashParam *sp)
-{
     uint32_t y[16];
     int i;
-    int r;
 
     for (r = 0; r < sp->rounds; ++r) {
 
@@ -132,8 +165,8 @@ static inline void transform(cubehashParam *sp)
 	for (i = 0; i < 16; ++i) sp->x[i + 16] = y[i];
 
     }
-}
-#endif	/* OPTIMIZE_SSE2 */
+#endif	
+}  // transform
 
 int cubehashInit(cubehashParam *sp, int hashbitlen, int rounds, int blockbytes)
 {

@@ -7,6 +7,7 @@
  * - implements NIST hash api
  * - assumes that message lenght is multiple of 8-bits
  * - _ECHO_VPERM_ must be defined if compiling with ../main.c
+ * -  define NO_AES_NI for aes_ni version
  *
  * Cagdas Calik
  * ccalik@metu.edu.tr
@@ -432,29 +433,6 @@ HashReturn init_echo(hashState_echo *ctx, int nHashSize)
 
 	return SUCCESS;
 }
-
-HashReturn reinit_echo512(hashState_echo *ctx)
-{
-     int i, j;
-     ctx->k = _mm_xor_si128(ctx->k, ctx->k);
-     ctx->processed_bits = 0;
-     ctx->uBufferBytes = 0;
-
-     ctx->hashsize = _mm_set_epi32(0, 0, 0, 0x00000200);
-     ctx->const1536 = _mm_set_epi32(0x00000000, 0x00000000, 0x00000000, 0x00000400);
-
-     for(i = 0; i < 4; i++) 
-        for(j = 0; j < 2; j++)
-              ctx->state[i][j] = ctx->hashsize;
-
-     for(i = 0; i < 4; i++)
-         for(j = 2; j < 4; j++)
-               ctx->state[i][j] = _mm_set_epi32(0, 0, 0, 0);
-
-     return SUCCESS;
-}  
-
-
 
 HashReturn update_echo(hashState_echo *state, const BitSequence *data, DataLength databitlen)
 {

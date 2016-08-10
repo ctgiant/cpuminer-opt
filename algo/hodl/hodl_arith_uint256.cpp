@@ -4,11 +4,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "hodl_arith_uint256.h"
-
 #include "hodl_uint256.h"
 #include "utilstrencodings.h"
 #include "common.h"
-
 #include <stdio.h>
 #include <string.h>
 

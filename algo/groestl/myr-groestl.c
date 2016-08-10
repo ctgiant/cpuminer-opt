@@ -68,8 +68,7 @@ int scanhash_myriad(int thr_id, struct work *work,
 	if (opt_benchmark)
 		((uint32_t*)ptarget)[7] = 0x0000ff;
 
-	for (int k=0; k < 20; k++)
-		be32enc(&endiandata[k], ((uint32_t*)pdata)[k]);
+        swab32_array( endiandata, pdata, 20 );
 
 	do {
 		const uint32_t Htarg = ptarget[7];
@@ -94,6 +93,7 @@ int scanhash_myriad(int thr_id, struct work *work,
 bool register_myriad_algo( algo_gate_t* gate )
 {
     gate->aes_ni_optimized = true;
+    gate->optimizations = SSE2_OPT | AES_OPT | AVX_OPT;
     init_myrgr_ctx();
     gate->scanhash = (void*)&scanhash_myriad;
     gate->hash     = (void*)&myriadhash;

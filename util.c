@@ -154,6 +154,11 @@ void applog(int prio, const char *fmt, ...)
 	va_end(ap);
 }
 
+void log_sw_err( char* filename, int line_number, char* msg )
+{
+  applog( LOG_ERR, "SW_ERR: %s:%d, %s", filename, line_number, msg );
+}
+
 /* Get default config.json path (will be system specific) */
 void get_defconfig_path(char *out, size_t bufsize, char *argv0)
 {
@@ -1257,7 +1262,7 @@ static bool stratum_parse_extranonce(struct stratum_ctx *sctx, json_t *params, i
 	sctx->xnonce2_size = xn2_size;
 	pthread_mutex_unlock(&sctx->work_lock);
 
-	if (pndx == 0 && opt_debug) /* pool dynamic change */
+        if (pndx == 0 && opt_debug) /* pool dynamic change */
 		applog(LOG_DEBUG, "Stratum set nonce %s with extranonce2 size=%d",
 			xnonce1, xn2_size);
 
@@ -1685,33 +1690,45 @@ static uint32_t getblocheight(struct stratum_ctx *sctx)
 
 static bool stratum_notify(struct stratum_ctx *sctx, json_t *params)
 {
-	const char *job_id, *prevhash, *coinb1, *coinb2, *version, *nbits, *ntime;
+	const char *job_id, *prevhash, *coinb1, *coinb2, *version, *nbits, *stime;
+        const char *claim = NULL, *nreward = NULL;
 	size_t coinb1_size, coinb2_size;
 	bool clean, ret = false;
-	int merkle_count, i;
+	int merkle_count, i, p = 0;
 	json_t *merkle_arr;
-	uchar **merkle;
-
-	job_id = json_string_value(json_array_get(params, 0));
-	prevhash = json_string_value(json_array_get(params, 1));
-	coinb1 = json_string_value(json_array_get(params, 2));
-	coinb2 = json_string_value(json_array_get(params, 3));
-	merkle_arr = json_array_get(params, 4);
+	uchar **merkle = NULL;
+        bool has_claim = opt_algo == ALGO_LBRY;
+        int ntime;
+	job_id = json_string_value(json_array_get(params, p++));
+	prevhash = json_string_value(json_array_get(params, p++));
+        if ( has_claim )
+        {
+                claim = json_string_value(json_array_get(params, p++));
+                if (!claim || strlen(claim) != 64) 
+                {
+                        applog(LOG_ERR, "Stratum notify: invalid claim parameter");
+                        goto out;
+                }
+        }
+	coinb1 = json_string_value(json_array_get(params, p++));
+	coinb2 = json_string_value(json_array_get(params, p++));
+	merkle_arr = json_array_get(params, p++);
 	if (!merkle_arr || !json_is_array(merkle_arr))
 		goto out;
 	merkle_count = (int) json_array_size(merkle_arr);
-	version = json_string_value(json_array_get(params, 5));
-	nbits = json_string_value(json_array_get(params, 6));
-	ntime = json_string_value(json_array_get(params, 7));
-	clean = json_is_true(json_array_get(params, 8));
+	version = json_string_value(json_array_get(params, p++));
+	nbits = json_string_value(json_array_get(params, p++));
+	stime = json_string_value(json_array_get(params, p++));
+	clean = json_is_true(json_array_get(params, p)); p++;
 
-	if (!job_id || !prevhash || !coinb1 || !coinb2 || !version || !nbits || !ntime ||
+	if (!job_id || !prevhash || !coinb1 || !coinb2 || !version || !nbits || !stime ||
 	    strlen(prevhash) != 64 || strlen(version) != 8 ||
-	    strlen(nbits) != 8 || strlen(ntime) != 8) {
+	    strlen(nbits) != 8 || strlen(stime) != 8) {
 		applog(LOG_ERR, "Stratum notify: invalid parameters");
 		goto out;
 	}
-	merkle = (uchar**) malloc(merkle_count * sizeof(char *));
+
+        merkle = (uchar**) malloc(merkle_count * sizeof(char *));
 	for (i = 0; i < merkle_count; i++) {
 		const char *s = json_string_value(json_array_get(merkle_arr, i));
 		if (!s || strlen(s) != 64) {
@@ -1738,22 +1755,23 @@ static bool stratum_notify(struct stratum_ctx *sctx, json_t *params)
 	if (!sctx->job.job_id || strcmp(sctx->job.job_id, job_id))
 		memset(sctx->job.xnonce2, 0, sctx->xnonce2_size);
 	hex2bin(sctx->job.xnonce2 + sctx->xnonce2_size, coinb2, coinb2_size);
-
 	free(sctx->job.job_id);
 	sctx->job.job_id = strdup(job_id);
 	hex2bin(sctx->job.prevhash, prevhash, 32);
+        if (has_claim) hex2bin(sctx->job.claim, claim, 32);
 
 	sctx->bloc_height = getblocheight(sctx);
 
 	for (i = 0; i < sctx->job.merkle_count; i++)
 		free(sctx->job.merkle[i]);
+
 	free(sctx->job.merkle);
 	sctx->job.merkle = merkle;
 	sctx->job.merkle_count = merkle_count;
 
 	hex2bin(sctx->job.version, version, 4);
 	hex2bin(sctx->job.nbits, nbits, 4);
-	hex2bin(sctx->job.ntime, ntime, 4);
+	hex2bin(sctx->job.ntime, stime, 4);
 	sctx->job.clean = clean;
 
 	sctx->job.diff = sctx->next_diff;
@@ -1819,6 +1837,195 @@ static bool stratum_reconnect(struct stratum_ctx *sctx, json_t *params)
 
 	return true;
 }
+
+static bool json_object_set_error(json_t *result, int code, const char *msg)
+{
+	json_t *val = json_object();
+	json_object_set_new(val, "code", json_integer(code));
+	json_object_set_new(val, "message", json_string(msg));
+	return json_object_set_new(result, "error", val) != -1;
+}
+
+/* allow to report algo perf to the pool for algo stats */
+static bool stratum_benchdata(json_t *result, json_t *params, int thr_id)
+{
+	char algo[64] = { 0 };
+	char cpuname[80] = { 0 };
+	char vendorid[32] = { 0 };
+	char compiler[32] = { 0 };
+	char arch[16] = { 0 };
+	char os[8];
+	char *p;
+	double cpufreq = 0;
+	json_t *val;
+
+	if (!opt_stratum_stats) return false;
+
+	get_currentalgo(algo, sizeof(algo));
+
+#if defined(WIN32) && (defined(_M_X64) || defined(__x86_64__))
+	strcpy(os, "win64");
+#else
+	strcpy(os, is_windows() ? "win32" : "linux");
+#endif
+
+#ifdef _MSC_VER
+	sprintf(compiler, "MSVC %d\n", msver());
+#elif defined(__clang__)
+	sprintf(compiler, "clang %s\n", __clang_version__);
+#elif defined(__GNUC__)
+	sprintf(compiler, "GCC %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+#endif
+
+#ifdef __AVX2__
+	strcat(compiler, " AVX2");
+#elif defined(__AVX__)
+	strcat(compiler, " AVX");
+#elif defined(__FMA4__)
+	strcat(compiler, " FMA4");
+#elif defined(__FMA3__)
+	strcat(compiler, " FMA3");
+#elif defined(__SSE4_2__)
+	strcat(compiler, " SSE4.2");
+#elif defined(__SSE4_1__)
+	strcat(compiler, " SSE4");
+#elif defined(__SSE3__)
+	strcat(compiler, " SSE3");
+#elif defined(__SSE2__)
+	strcat(compiler, " SSE2");
+#elif defined(__SSE__)
+	strcat(compiler, " SSE");
+#endif
+
+	cpu_bestfeature(arch, 16);
+	if (has_aes_ni()) strcat(arch, " NI");
+
+	cpu_getmodelid(vendorid, 32);
+	cpu_getname(cpuname, 80);
+	p = strstr(cpuname, " @ ");
+	if (p) {
+		// linux only
+		char freq[32] = { 0 };
+		*p = '\0'; p += 3;
+		snprintf(freq, 32, "%s", p);
+		cpufreq = atof(freq);
+		p = strstr(freq, "GHz"); if (p) cpufreq *= 1000;
+		applog(LOG_NOTICE, "sharing CPU stats with freq %s", freq);
+	}
+
+	compiler[31] = '\0';
+
+	val = json_object();
+	json_object_set_new(val, "algo", json_string(algo));
+	json_object_set_new(val, "type", json_string("cpu"));
+	json_object_set_new(val, "device", json_string(cpuname));
+	json_object_set_new(val, "vendorid", json_string(vendorid));
+	json_object_set_new(val, "arch", json_string(arch));
+	json_object_set_new(val, "freq", json_integer((uint64_t)cpufreq));
+	json_object_set_new(val, "memf", json_integer(0));
+	json_object_set_new(val, "power", json_integer(0));
+	json_object_set_new(val, "khashes", json_real((double)global_hashrate / 1000.0));
+	json_object_set_new(val, "intensity", json_real(opt_priority));
+	json_object_set_new(val, "throughput", json_integer(opt_n_threads));
+	json_object_set_new(val, "client", json_string(PACKAGE_NAME "/" PACKAGE_VERSION));
+	json_object_set_new(val, "os", json_string(os));
+	json_object_set_new(val, "driver", json_string(compiler));
+
+	json_object_set_new(result, "result", val);
+
+	return true;
+}
+
+static bool stratum_get_stats(struct stratum_ctx *sctx, json_t *id, json_t *params)
+{
+	char *s;
+	json_t *val;
+	bool ret;
+
+	if (!id || json_is_null(id))
+		return false;
+
+	val = json_object();
+	json_object_set(val, "id", id);
+
+	ret = stratum_benchdata(val, params, 0);
+
+	if (!ret) {
+		json_object_set_error(val, 1, "disabled"); //EPERM
+	} else {
+		json_object_set_new(val, "error", json_null());
+	}
+
+	s = json_dumps(val, 0);
+	ret = stratum_send_line(sctx, s);
+	json_decref(val);
+	free(s);
+
+	return ret;
+}
+
+static bool stratum_unknown_method(struct stratum_ctx *sctx, json_t *id)
+{
+	char *s;
+	json_t *val;
+	bool ret = false;
+
+	if (!id || json_is_null(id))
+		return ret;
+
+	val = json_object();
+	json_object_set(val, "id", id);
+	json_object_set_new(val, "result", json_false());
+	json_object_set_error(val, 38, "unknown method"); // ENOSYS
+
+	s = json_dumps(val, 0);
+	ret = stratum_send_line(sctx, s);
+	json_decref(val);
+	free(s);
+
+	return ret;
+}
+
+static bool stratum_pong(struct stratum_ctx *sctx, json_t *id)
+{
+	char buf[64];
+	bool ret = false;
+
+	if (!id || json_is_null(id))
+		return ret;
+
+	sprintf(buf, "{\"id\":%d,\"result\":\"pong\",\"error\":null}",
+		(int) json_integer_value(id));
+	ret = stratum_send_line(sctx, buf);
+
+	return ret;
+}
+
+static bool stratum_get_algo(struct stratum_ctx *sctx, json_t *id, json_t *params)
+{
+	char algo[64] = { 0 };
+	char *s;
+	json_t *val;
+	bool ret = true;
+
+	if (!id || json_is_null(id))
+		return false;
+
+	get_currentalgo(algo, sizeof(algo));
+
+	val = json_object();
+	json_object_set(val, "id", id);
+	json_object_set_new(val, "error", json_null());
+	json_object_set_new(val, "result", json_string(algo));
+
+	s = json_dumps(val, 0);
+	ret = stratum_send_line(sctx, s);
+	json_decref(val);
+	free(s);
+
+	return ret;
+}
+
 
 static bool stratum_get_version(struct stratum_ctx *sctx, json_t *id)
 {
@@ -1898,6 +2105,11 @@ bool stratum_handle_method(struct stratum_ctx *sctx, const char *s)
 		ret = stratum_notify(sctx, params);
 		goto out;
 	}
+	if (!strcasecmp(method, "mining.ping")) { // cgminer 4.7.1+
+		if (opt_debug) applog(LOG_DEBUG, "Pool ping");
+		ret = stratum_pong(sctx, id);
+		goto out;
+	}
 	if (!strcasecmp(method, "mining.set_difficulty")) {
 		ret = stratum_set_difficulty(sctx, params);
 		goto out;
@@ -1910,6 +2122,17 @@ bool stratum_handle_method(struct stratum_ctx *sctx, const char *s)
 		ret = stratum_reconnect(sctx, params);
 		goto out;
 	}
+	if (!strcasecmp(method, "client.get_algo")) {
+		// will prevent wrong algo parameters on a pool, will be used as test on rejects
+		if (!opt_quiet) applog(LOG_NOTICE, "Pool asked your algo parameter");
+		ret = stratum_get_algo(sctx, id, params);
+		goto out;
+	}
+	if (!strcasecmp(method, "client.get_stats")) {
+		// optional to fill device benchmarks
+		ret = stratum_get_stats(sctx, id, params);
+		goto out;
+	}
 	if (!strcasecmp(method, "client.get_version")) {
 		ret = stratum_get_version(sctx, id);
 		goto out;
@@ -1919,6 +2142,11 @@ bool stratum_handle_method(struct stratum_ctx *sctx, const char *s)
 		goto out;
 	}
 
+	if (!ret) {
+		// don't fail = disconnect stratum on unknown (and optional?) methods
+		if (opt_debug) applog(LOG_WARNING, "unknown stratum method %s!", method);
+		ret = stratum_unknown_method(sctx, id);
+	}
 out:
 	if (val)
 		json_decref(val);

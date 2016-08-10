@@ -43,18 +43,6 @@ typedef struct
 
 } hashState_echo;
 
-// init non-zero constants, dynamic data inited in reinit_echo
-static hashState_echo initial_echo512_ctx =
-{
- 0, 0,
- 0,   //  _mm_set_epi32(0, 0, 0, 0x00000200), // hashsize 
- 0,
- 0,  // _mm_set_epi32(0x00000000, 0x00000000, 0x00000000, 0x00000400),  //const1536
- 10,   // uRounds
- 512,  // uHashSize
- 128,  // uBlockLength
-};
-
 HashReturn init_echo(hashState_echo *state, int hashbitlen);
 
 HashReturn reinit_echo(hashState_echo *state);

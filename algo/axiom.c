@@ -18,7 +18,7 @@ void axiomhash(void *output, const void *input)
 	sph_shabal256_close(&ctx, M[0]);
 
 	for(int i = 1; i < N; i++) {
-		//sph_shabal256_init(&ctx);
+		sph_shabal256_init(&ctx);
 		sph_shabal256(&ctx, M[i-1], 32);
 		sph_shabal256_close(&ctx, M[i]);
 	}
@@ -29,7 +29,7 @@ void axiomhash(void *output, const void *input)
 		const int q = M[p][0] % 0xFFFF;
 		const int j = (b + q) % N;
 
-		//sph_shabal256_init(&ctx);
+		sph_shabal256_init(&ctx);
 #if 0
 		sph_shabal256(&ctx, M[p], 32);
 		sph_shabal256(&ctx, M[j], 32);
@@ -57,9 +57,8 @@ int scanhash_axiom(int thr_id, struct work *work,
 
 	uint32_t n = first_nonce;
 
-	for (int i=0; i < 19; i++) {
-		be32enc(&endiandata[i], pdata[i]);
-	}
+        for (int k = 0; k < 19; k++)
+                be32enc(&endiandata[k], pdata[k]);
 
 	do {
 		be32enc(&endiandata[19], n);

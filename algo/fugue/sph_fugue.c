@@ -1105,7 +1105,7 @@ fugue4_close(sph_fugue_context *sc, unsigned ub, unsigned n, void *dst)
 	sph_enc32be(out + 52, S[28]);
 	sph_enc32be(out + 56, S[29]);
 	sph_enc32be(out + 60, S[30]);
-	sph_fugue512_init(sc);
+//	sph_fugue512_init(sc);
 }
 
 void

@@ -1,6 +1,7 @@
 #ifndef CUBEHASH_SSE2_H__
 #define CUBEHASH_SSE2_H__
 
+#include "compat.h"
 #include <stdint.h>
 #include "algo/sha3/sha3-defs.h"
 //#include <beecrypt/beecrypt.h>
@@ -25,7 +26,7 @@ struct _cubehashParam
     int blockbytes;
     int pos;		/* number of bits read into x from current block */
 #if defined(OPTIMIZE_SSE2)
-    __m128i x[8];
+    __m128i _ALIGN(256) x[8];
 #else
     uint32_t x[32];
 #endif

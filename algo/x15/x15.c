@@ -193,11 +193,7 @@ static void x15hash(void *output, const void *input)
 	sph_whirlpool_close(&ctx.whirlpool, hashB);
 
 
-#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
-    	__asm__ volatile("emms");
-#else
-		asm volatile ("emms");
-#endif		
+        asm volatile ("emms");
 	memcpy(output, hashB, 32);
 }
 
@@ -287,15 +283,13 @@ void x15hash_alt(void *output, const void *input)
 int scanhash_x15(int thr_id, struct work *work,
                     uint32_t max_nonce, uint64_t *hashes_done)
 {
+        uint32_t endiandata[20] __attribute__((aligned(64)));
+        uint32_t hash64[8] __attribute__((aligned(32)));
         uint32_t *pdata = work->data;
         uint32_t *ptarget = work->target;
-
 	uint32_t n = pdata[19] - 1;
 	const uint32_t first_nonce = pdata[19];
 	const uint32_t Htarg = ptarget[7];
-
-	uint32_t _ALIGN(32) hash64[8];
-	uint32_t endiandata[32];
 
 	uint64_t htmax[] = {
 		0,
@@ -314,47 +308,9 @@ int scanhash_x15(int thr_id, struct work *work,
 		0
 	};
 
-//       init_x15_ctx();
-
 	// we need bigendian data...
+        swab32_array( endiandata, pdata, 20 );
 
-                be32enc( &endiandata[0], ((uint32_t*)pdata)[0] );
-                be32enc( &endiandata[1], ((uint32_t*)pdata)[1] );
-                be32enc( &endiandata[2], ((uint32_t*)pdata)[2] );
-                be32enc( &endiandata[3], ((uint32_t*)pdata)[3] );
-                be32enc( &endiandata[4], ((uint32_t*)pdata)[4] );
-                be32enc( &endiandata[5], ((uint32_t*)pdata)[5] );
-                be32enc( &endiandata[6], ((uint32_t*)pdata)[6] );
-                be32enc( &endiandata[7], ((uint32_t*)pdata)[7] );
-                be32enc( &endiandata[8], ((uint32_t*)pdata)[8] );
-                be32enc( &endiandata[9], ((uint32_t*)pdata)[9] );
-                be32enc( &endiandata[10], ((uint32_t*)pdata)[10] );
-                be32enc( &endiandata[11], ((uint32_t*)pdata)[11] );
-                be32enc( &endiandata[12], ((uint32_t*)pdata)[12] );
-                be32enc( &endiandata[13], ((uint32_t*)pdata)[13] );
-                be32enc( &endiandata[14], ((uint32_t*)pdata)[14] );
-                be32enc( &endiandata[15], ((uint32_t*)pdata)[15] );
-                be32enc( &endiandata[16], ((uint32_t*)pdata)[16] );
-                be32enc( &endiandata[17], ((uint32_t*)pdata)[17] );
-                be32enc( &endiandata[18], ((uint32_t*)pdata)[18] );
-                be32enc( &endiandata[19], ((uint32_t*)pdata)[19] );
-                be32enc( &endiandata[20], ((uint32_t*)pdata)[20] );
-                be32enc( &endiandata[21], ((uint32_t*)pdata)[21] );
-                be32enc( &endiandata[22], ((uint32_t*)pdata)[22] );
-                be32enc( &endiandata[23], ((uint32_t*)pdata)[23] );
-                be32enc( &endiandata[24], ((uint32_t*)pdata)[24] );
-                be32enc( &endiandata[25], ((uint32_t*)pdata)[25] );
-                be32enc( &endiandata[26], ((uint32_t*)pdata)[26] );
-                be32enc( &endiandata[27], ((uint32_t*)pdata)[27] );
-                be32enc( &endiandata[28], ((uint32_t*)pdata)[28] );
-                be32enc( &endiandata[29], ((uint32_t*)pdata)[29] );
-                be32enc( &endiandata[30], ((uint32_t*)pdata)[30] );
-                be32enc( &endiandata[31], ((uint32_t*)pdata)[31] );
-
-
-//	for (int kk=0; kk < 32; kk++) {
-//		be32enc(&endiandata[kk], ((uint32_t*)pdata)[kk]);
-//	};
 #ifdef DEBUG_ALGO
 	if (Htarg != 0)
 		printf("[%d] Htarg=%X\n", thr_id, Htarg);
@@ -402,6 +358,7 @@ int scanhash_x15(int thr_id, struct work *work,
 bool register_x15_algo( algo_gate_t* gate )
 {
   gate->aes_ni_optimized = true;
+  gate->optimizations = SSE2_OPT | AES_OPT | AVX_OPT | AVX2_OPT;
   init_x15_ctx();
   gate->scanhash = (void*)&scanhash_x15;
   gate->hash     = (void*)&x15hash;

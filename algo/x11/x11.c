@@ -34,26 +34,18 @@
 #include "algo/skein/sse2/skein.c"
 #include "algo/jh/sse2/jh_sse2_opt64.h"
 
-/*define data alignment for different C compilers*/
-#if defined(__GNUC__)
-#define DATA_ALIGNXY(x,y) x __attribute__ ((aligned(y)))
-#else
-#define DATA_ALIGNXY(x,y) __declspec(align(y)) x
-#endif
-
-
 typedef struct {
+    hashState_luffa         luffa;
+    cubehashParam           cube;
+    hashState_sd            simd;
     sph_shavite512_context  shavite;
 #ifdef NO_AES_NI
-    sph_groestl512_context  groestl;
+//    sph_groestl512_context  groestl;
     sph_echo512_context     echo;
 #else
-     hashState_echo          echo;
-     hashState_groestl       groestl;
+    hashState_echo          echo;
+    hashState_groestl       groestl;
 #endif
-     hashState_luffa         luffa;
-     cubehashParam           cube;
-     hashState_sd            simd;
 } x11_ctx_holder;
 
 x11_ctx_holder x11_ctx;
@@ -65,7 +57,7 @@ void init_x11_ctx()
      sph_shavite512_init( &x11_ctx.shavite );
      init_sd( &x11_ctx.simd, 512 );
 #ifdef NO_AES_NI
-     sph_groestl512_init( &x11_ctx.groestl );
+//     sph_groestl512_init( &x11_ctx.groestl );
      sph_echo512_init( &x11_ctx.echo );
 #else
      init_echo( &x11_ctx.echo, 512 );
@@ -75,31 +67,18 @@ void init_x11_ctx()
 
 static void x11_hash( void *state, const void *input )
 {
-#ifdef NO_AES_NI
-     grsoState sts_grs;
-#endif
-     x11_ctx_holder ctx;
-     memcpy( &ctx, &x11_ctx, sizeof(x11_ctx) );
-
-//        DATA_ALIGNXY(unsigned char hashbuf[128],16);
-     size_t hashptr;
-//        DATA_ALIGNXY(sph_u64 hashctA,8);
-//        DATA_ALIGNXY(sph_u64 hashctB,8);
-
-//        DATA_ALIGNXY(unsigned char hash[128],16);
-     unsigned char hashbuf[128];
+     unsigned char hash[128] __attribute__ ((aligned (16)));
+     unsigned char hashbuf[128] __attribute__ ((aligned (16)));
      sph_u64 hashctA;
      sph_u64 hashctB;
-
-     unsigned char hash[128];
-//     unsigned char hash[128] __attribute__ ((aligned (16)));
+     x11_ctx_holder ctx;
+     memcpy( &ctx, &x11_ctx, sizeof(x11_ctx) );
+     size_t hashptr;
 
      DECL_BLK;
      BLK_I;
      BLK_W;
      BLK_C;
-
-     //---bmw2---
 
      DECL_BMW;
      BMW_I;
@@ -112,33 +91,26 @@ static void x11_hash( void *state, const void *input )
      #undef H
      #undef dH
 
-     //---grs3----
-
 #ifdef NO_AES_NI
-           GRS_I;
-           GRS_U;
-           GRS_C;
+     grsoState sts_grs;
+     GRS_I;
+     GRS_U;
+     GRS_C;
 
 //     sph_groestl512 (&ctx.groestl, hash, 64);
 //     sph_groestl512_close(&ctx.groestl, hash);
 #else
-     update_groestl( &ctx.groestl, (char*)hash,512);
-     final_groestl( &ctx.groestl, (char*)hash);
+     update_groestl( &ctx.groestl, (char*)hash, 512 );
+     final_groestl( &ctx.groestl, (char*)hash );
 #endif
-
-     //---skein4---
 
      DECL_SKN;
      SKN_I;
      SKN_U;
      SKN_C;
 
-     //---jh5------
-
      DECL_JH;
      JH_H;
-
-     //---keccak6---
 
      DECL_KEC;
      KEC_I;
@@ -147,38 +119,28 @@ static void x11_hash( void *state, const void *input )
 
 //   asm volatile ("emms");
 
-     //--- luffa7
+     update_luffa( &ctx.luffa, (const BitSequence*)hash, 512 );
+     final_luffa( &ctx.luffa, (BitSequence*)hash+64 );
 
-     update_luffa( &ctx.luffa, (const BitSequence*)hash,512);
-     final_luffa( &ctx.luffa, (BitSequence*)hash+64);
+     cubehashUpdate( &ctx.cube, (const byte*) hash+64, 64 );
+     cubehashDigest( &ctx.cube, (byte*)hash );
 
-     //---cubehash---
+     sph_shavite512( &ctx.shavite, hash, 64 );
+     sph_shavite512_close( &ctx.shavite, hash+64 );
 
-     cubehashUpdate( &ctx.cube, (const byte*) hash+64,64);
-     cubehashDigest( &ctx.cube, (byte*)hash);
-
-     //---shavite---
-  
-     sph_shavite512( &ctx.shavite, hash, 64);
-     sph_shavite512_close( &ctx.shavite, hash+64);
-
-     //-------simd512 vect128 --------------
-
-     update_sd( &ctx.simd, (const BitSequence *)hash+64,512);
-     final_sd( &ctx.simd, (BitSequence *)hash);
-
-     //---echo---
+     update_sd( &ctx.simd, (const BitSequence *)hash+64, 512 );
+     final_sd( &ctx.simd, (BitSequence *)hash );
 
 #ifdef NO_AES_NI
-     sph_echo512 (&ctx.echo, hash, 64);
-     sph_echo512_close(&ctx.echo, hash+64);
+     sph_echo512 (&ctx.echo, hash, 64 );
+     sph_echo512_close(&ctx.echo, hash+64 );
 #else
-     update_echo ( &ctx.echo, (const BitSequence *) hash, 512);
+     update_echo ( &ctx.echo, (const BitSequence *) hash, 512 );
      final_echo( &ctx.echo, (BitSequence *) hash+64 );
 #endif
 
 //        asm volatile ("emms");
-	memcpy(state, hash+64, 32);
+     memcpy( state, hash+64, 32 );
 }
 
 
@@ -246,157 +208,55 @@ static void x11hash_alt( void *output, const void *input )
         memcpy(output, hashA, 32);
 }
 
-
-
-int scanhash_x11(int thr_id, struct work *work,
-             uint32_t max_nonce, uint64_t *hashes_done)
+int scanhash_x11( int thr_id, struct work *work, uint32_t max_nonce,
+                  uint64_t *hashes_done )
 {
+        uint32_t endiandata[20] __attribute__((aligned(64)));
+        uint32_t hash64[8] __attribute__((aligned(64)));
         uint32_t *pdata = work->data;
         uint32_t *ptarget = work->target;
 	uint32_t n = pdata[19] - 1;
 	const uint32_t first_nonce = pdata[19];
 	const uint32_t Htarg = ptarget[7];
+        uint64_t htmax[] = {
+                0,
+                0xF,
+                0xFF,
+                0xFFF,
+                0xFFFF,
+                0x10000000
+        };
+        uint32_t masks[] = {
+                0xFFFFFFFF,
+                0xFFFFFFF0,
+                0xFFFFFF00,
+                0xFFFFF000,
+                0xFFFF0000,
+                0
+        };
 
-	uint32_t hash64[8] __attribute__((aligned(32)));
-        uint32_t endiandata[32];
+        // big endian encode 0..18 uint32_t, 64 bits at a time
+        swab32_array( endiandata, pdata, 20 );
 
-        be32enc( &endiandata[0], ((uint32_t*)pdata)[0] );
-        be32enc( &endiandata[1], ((uint32_t*)pdata)[1] );
-        be32enc( &endiandata[2], ((uint32_t*)pdata)[2] );
-        be32enc( &endiandata[3], ((uint32_t*)pdata)[3] );
-        be32enc( &endiandata[4], ((uint32_t*)pdata)[4] );
-        be32enc( &endiandata[5], ((uint32_t*)pdata)[5] );
-        be32enc( &endiandata[6], ((uint32_t*)pdata)[6] );
-        be32enc( &endiandata[7], ((uint32_t*)pdata)[7] );
-        be32enc( &endiandata[8], ((uint32_t*)pdata)[8] );
-        be32enc( &endiandata[9], ((uint32_t*)pdata)[9] );
-        be32enc( &endiandata[10], ((uint32_t*)pdata)[10] );
-        be32enc( &endiandata[11], ((uint32_t*)pdata)[11] );
-        be32enc( &endiandata[12], ((uint32_t*)pdata)[12] );
-        be32enc( &endiandata[13], ((uint32_t*)pdata)[13] );
-        be32enc( &endiandata[14], ((uint32_t*)pdata)[14] );
-        be32enc( &endiandata[15], ((uint32_t*)pdata)[15] );
-        be32enc( &endiandata[16], ((uint32_t*)pdata)[16] );
-        be32enc( &endiandata[17], ((uint32_t*)pdata)[17] );
-        be32enc( &endiandata[18], ((uint32_t*)pdata)[18] );
-        be32enc( &endiandata[19], ((uint32_t*)pdata)[19] );
-        be32enc( &endiandata[20], ((uint32_t*)pdata)[20] );
-        be32enc( &endiandata[21], ((uint32_t*)pdata)[21] );
-        be32enc( &endiandata[22], ((uint32_t*)pdata)[22] );
-        be32enc( &endiandata[23], ((uint32_t*)pdata)[23] );
-        be32enc( &endiandata[24], ((uint32_t*)pdata)[24] );
-        be32enc( &endiandata[25], ((uint32_t*)pdata)[25] );
-        be32enc( &endiandata[26], ((uint32_t*)pdata)[26] );
-        be32enc( &endiandata[27], ((uint32_t*)pdata)[27] );
-        be32enc( &endiandata[28], ((uint32_t*)pdata)[28] );
-        be32enc( &endiandata[29], ((uint32_t*)pdata)[29] );
-        be32enc( &endiandata[30], ((uint32_t*)pdata)[30] );
-        be32enc( &endiandata[31], ((uint32_t*)pdata)[31] );
-
-//        int kk=0;
-//	for (; kk < 32; kk++){
-//		be32enc( &endiandata[kk], ((uint32_t*)pdata)[kk] );
-//	};
-
-        if ( ptarget[7] == 0 )
-        {
-          do
+        for (int m=0; m < 6; m++) 
+          if (Htarg <= htmax[m])
           {
-            pdata[19] = ++n;
-            be32enc( &endiandata[19], n );
-            x11_hash( hash64, &endiandata );
-            if ( (hash64[7] & 0xFFFFFFFF) == 0 )
+            uint32_t mask = masks[m];
+            do
             {
-               if ( fulltest(hash64, ptarget))
-               {
-                   *hashes_done = n - first_nonce + 1;
-                   return true;
-               }
-             }
-          } while ( n < max_nonce && !work_restart[thr_id].restart );        
-        }
-        else if ( ptarget[7] <=0xF )
-        {
-           do
-           {
-             pdata[19] = ++n;
-             be32enc( &endiandata[19], n );
-             x11_hash( hash64, &endiandata );
-             if ( (hash64[7] & 0xFFFFFFF0) == 0 )
-             {
-               if ( fulltest(hash64, ptarget) )
-               {
-                 *hashes_done = n - first_nonce + 1;
-                 return true;
-               }
-             }              
-           } while ( n < max_nonce && !work_restart[thr_id].restart );        
-        }
-        else if ( ptarget[7] <= 0xFF )
-        {
-          do
-          {
-            pdata[19] = ++n;
-            be32enc( &endiandata[19], n );
-            x11_hash( hash64, &endiandata );
-            if ( (hash64[7] & 0xFFFFFF00) == 0 )
-            {
-              if ( fulltest(hash64, ptarget) )
+              pdata[19] = ++n;
+              be32enc( &endiandata[19], n );
+              x11_hash( hash64, &endiandata );
+              if ( ( hash64[7] & mask ) == 0 )
               {
-                *hashes_done = n - first_nonce + 1;
-                return true;
+                 if ( fulltest( hash64, ptarget ) )
+                 {
+                    *hashes_done = n - first_nonce + 1;
+                    return true;
+                 }
               }
-            }
-          } while ( n < max_nonce && !work_restart[thr_id].restart );        
-        }
-        else if ( ptarget[7] <= 0xFFF )
-        {
-          do
-          {
-            pdata[19] = ++n;
-            be32enc( &endiandata[19], n );
-            x11_hash( hash64, &endiandata );
-            if ( (hash64[7] & 0xFFFFF000) == 0 )
-            {
-              if ( fulltest(hash64, ptarget) )
-              {
-                *hashes_done = n - first_nonce + 1;
-                return true;
-              }
-            }
-          } while ( n < max_nonce && !work_restart[thr_id].restart );        
-        }
-        else if ( ptarget[7] <= 0xFFFF )
-        {
-          do
-          {
-            pdata[19] = ++n;
-            be32enc( &endiandata[19], n );
-            x11_hash( hash64, &endiandata );
-            if ( (hash64[7] & 0xFFFF0000) == 0)
-            {
-              if ( fulltest(hash64, ptarget) )
-              {
-                *hashes_done = n - first_nonce + 1;
-                return true;
-              }
-            }
-          } while ( n < max_nonce && !work_restart[thr_id].restart );        
-        }
-        else
-        {
-          do
-          {
-            pdata[19] = ++n;
-            be32enc( &endiandata[19], n );
-            x11_hash( hash64, &endiandata );
-            if ( fulltest( hash64, ptarget) )
-            {
-              *hashes_done = n - first_nonce + 1;
-              return true;
-            }
-          } while ( n < max_nonce && !work_restart[thr_id].restart );        
-        }
+            } while ( n < max_nonce && !work_restart[thr_id].restart );
+          }
 
         *hashes_done = n - first_nonce + 1;
         pdata[19] = n;
@@ -406,6 +266,7 @@ int scanhash_x11(int thr_id, struct work *work,
 bool register_x11_algo( algo_gate_t* gate )
 {
   gate->aes_ni_optimized = true;
+  gate->optimizations = SSE2_OPT | AES_OPT | AVX_OPT | AVX2_OPT;
   init_x11_ctx();
   gate->scanhash  = (void*)&scanhash_x11;
   gate->hash      = (void*)&x11_hash;

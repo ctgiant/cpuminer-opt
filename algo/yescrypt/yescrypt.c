@@ -23,9 +23,8 @@ int scanhash_yescrypt(int thr_id, struct work *work, uint32_t max_nonce, uint64_
 	const uint32_t first_nonce = pdata[19];
 	uint32_t n = first_nonce;
 
-	for (int i=0; i < 19; i++) {
-		be32enc(&endiandata[i], pdata[i]);
-	}
+        for (int k = 0; k < 19; k++)
+                be32enc(&endiandata[k], pdata[k]);
 
 	do {
 		be32enc(&endiandata[19], n);

@@ -207,24 +207,24 @@ void c11hash_alt( void *output, const void *input )
 int scanhash_c11( int thr_id, struct work *work, uint32_t max_nonce,
                   uint64_t *hashes_done )
 {
+        uint32_t endiandata[20] __attribute__((aligned(64)));
+        uint32_t hash[8] __attribute__((aligned(32)));
         uint32_t *pdata = work->data;
         uint32_t *ptarget = work->target;
 	const uint32_t first_nonce = pdata[19];
-	uint32_t _ALIGN(64) endiandata[20];
+        const uint32_t Htarg = ptarget[7];
 	uint32_t nonce = first_nonce;
 	volatile uint8_t *restart = &(work_restart[thr_id].restart);
 
 	if (opt_benchmark)
 		((uint32_t*)ptarget)[7] = 0x0cff;
-	for ( int k=0; k < 19; k++ )
-		be32enc( &endiandata[k], pdata[k] );
-	const uint32_t Htarg = ptarget[7];
+
+        swab32_array( endiandata, pdata, 20 );
+
 	do
         {
-		uint32_t hash[8];
 		be32enc( &endiandata[19], nonce );
 		c11hash( hash, endiandata );
-
 		if ( hash[7] <= Htarg && fulltest(hash, ptarget) )
                 {
 			pdata[19] = nonce;
@@ -241,6 +241,7 @@ int scanhash_c11( int thr_id, struct work *work, uint32_t max_nonce,
 bool register_c11_algo( algo_gate_t* gate )
 {
   gate->aes_ni_optimized = true;
+  gate->optimizations = SSE2_OPT | AES_OPT | AVX_OPT | AVX2_OPT;
   init_c11_ctx();
   gate->scanhash  = (void*)&scanhash_c11;
   gate->hash      = (void*)&c11hash;

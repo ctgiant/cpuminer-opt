@@ -1,6 +1,5 @@
 #include "miner.h"
-//#include "algo-gate-api.h"
-
+#include "hodl-gate.h"
 #include "hodl_uint256.h"
 #include "hodl_arith_uint256.h"
 #include "block.h"
@@ -39,8 +38,9 @@ void SHA512Filler(char *mainMemoryPsuedoRandomData, int threadNumber, uint256 mi
 extern "C"
 // max_nonce is not used by this function
 int scanhash_hodl( int threadNumber, struct work* work, uint32_t max_nonce,
-            uint64_t *hashes_done, unsigned char *mainMemoryPsuedoRandomData )
+                   uint64_t *hashes_done )
 {
+    unsigned char *mainMemoryPsuedoRandomData = hodl_scratchbuf;
     uint32_t *pdata = work->data;
     uint32_t *ptarget = work->target;
 
@@ -164,7 +164,5 @@ void GetPsuedoRandomData( char* mainMemoryPsuedoRandomData, uint32_t *pdata,
     pblock.hashMerkleRoot= uint256S(m.str());
     pblock.nNonce=swab32(pdata[19]);
     uint256 midHash = Hash(BEGIN(pblock.nVersion), END(pblock.nNonce));
-//    SHA512Filler(mainMemoryPsuedoRandomData, thr_id, totalThreads, midHash);
     SHA512Filler( mainMemoryPsuedoRandomData, thr_id, midHash);
   }
-

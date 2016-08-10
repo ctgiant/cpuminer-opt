@@ -1319,7 +1319,7 @@ void
 sph_luffa224_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	luffa3_close(cc, ub, n, dst, 7);
-	sph_luffa224_init(cc);
+//	sph_luffa224_init(cc);
 }
 
 /* see sph_luffa.h */
@@ -1352,7 +1352,7 @@ void
 sph_luffa256_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	luffa3_close(cc, ub, n, dst, 8);
-	sph_luffa256_init(cc);
+//	sph_luffa256_init(cc);
 }
 
 /* see sph_luffa.h */
@@ -1385,7 +1385,7 @@ void
 sph_luffa384_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	luffa4_close(cc, ub, n, dst);
-	sph_luffa384_init(cc);
+//	sph_luffa384_init(cc);
 }
 
 /* see sph_luffa.h */
@@ -1418,7 +1418,7 @@ void
 sph_luffa512_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	luffa5_close(cc, ub, n, dst);
-	sph_luffa512_init(cc);
+//	sph_luffa512_init(cc);
 }
 
 #ifdef __cplusplus

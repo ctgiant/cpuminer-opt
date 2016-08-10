@@ -8,25 +8,37 @@
 //#include "miner.h"
 #include "algo-gate-api.h"
 
+#ifndef NO_AES_NI
+  #include "algo/groestl/aes_ni/hash-groestl256.h"
+#endif
+
 #include "crypto/c_groestl.h"
 #include "crypto/c_blake256.h"
 #include "crypto/c_jh.h"
 #include "crypto/c_skein.h"
 #include "cryptonight.h"
 
+/*
 #if defined __unix__ && (!defined __APPLE__)
 #include <sys/mman.h>
 #elif defined _WIN32
 #include <windows.h>
 #endif
-
+*/
 
 void do_blake_hash(const void* input, size_t len, char* output) {
     blake256_hash((uint8_t*)output, input, len);
 }
 
 void do_groestl_hash(const void* input, size_t len, char* output) {
+#ifdef NO_AES_NI
     groestl(input, len * 8, (uint8_t*)output);
+#else
+    hashState_groestl256 ctx;
+    init_groestl256( &ctx );
+    update_groestl256( &ctx, input, len * 8 );
+    final_groestl256( &ctx, output );
+#endif
 }
 
 void do_jh_hash(const void* input, size_t len, char* output) {
@@ -74,8 +86,8 @@ int scanhash_cryptonight( int thr_id, struct work *work, uint32_t max_nonce,
     do
     {
        *nonceptr = ++n;
-       cryptonight_hash(hash, pdata, 76 );
-       if (unlikely(hash[7] < ptarget[7]))
+       cryptonight_hash( hash, pdata, 76 );
+       if (unlikely( hash[7] < Htarg ))
        {
            *hashes_done = n - first_nonce + 1;
 	   return true;
@@ -90,6 +102,7 @@ bool register_cryptonight_algo( algo_gate_t* gate )
 {
   register_json_rpc2( gate );
   gate->aes_ni_optimized = true;
+  gate->optimizations = SSE2_OPT | AES_OPT | AVX_OPT;
   gate->scanhash         = (void*)&scanhash_cryptonight;
   gate->hash             = (void*)&cryptonight_hash;
   gate->hash_suw         = (void*)&cryptonight_hash_suw;  

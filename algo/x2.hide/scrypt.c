@@ -759,11 +759,9 @@ int scanhash_scrypt(int thr_id, uint32_t *pdata,
 
 bool register_scrypt_algo( algo_gate_t* gate )
 {
-//  gate->init_ctx = &init_x14_aes_ctx;
     gate->scanhash = &scanhash_scrypt;
     gate->hash     = &scrypt_hash;
 //    gate->get_max64 = scrypt_get_max64;
-//  gate->custom_opt = cryptonight_custom_opt
     return true;
 };
 

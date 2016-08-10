@@ -668,7 +668,7 @@ void
 sph_tiger_close(void *cc, void *dst)
 {
 	tiger_close(cc, dst, 3);
-	sph_tiger_init(cc);
+//	sph_tiger_init(cc);
 }
 
 /* see sph_tiger.h */
@@ -691,7 +691,7 @@ void
 sph_tiger2_close(void *cc, void *dst)
 {
 	tiger2_close(cc, dst, 3);
-	sph_tiger2_init(cc);
+//	sph_tiger2_init(cc);
 }
 
 #endif

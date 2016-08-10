@@ -10,7 +10,7 @@
 #define __hash_h
 
 #include <stdio.h>
-#if defined(_WIN32)	|| defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+#if defined(_WIN64) || defined(__WINDOWS__)
 #include <windows.h>
 #endif
 #include <stdlib.h>
@@ -27,7 +27,7 @@ typedef crypto_uint8 u8;
 typedef crypto_uint32 u32;
 typedef crypto_uint64 u64;
 #endif
- */
+ * /
 /* eBash API end */
 
 #define LENGTH (512)
@@ -41,27 +41,27 @@ typedef crypto_uint64 u64;
 #endif
 
 #ifndef LENGTH
-#define LENGTH 256
+#define LENGTH (256)
 #endif
 
 /* some sizes (number of bytes) */
-#define ROWS 8
-#define LENGTHFIELDLEN ROWS
-#define COLS512 8
-#define COLS1024 16
-#define SIZE512 (ROWS*COLS512)
-#define SIZE1024 (ROWS*COLS1024)
-#define ROUNDS512 10
-#define ROUNDS1024 14
+#define ROWS (8)
+#define LENGTHFIELDLEN (ROWS)
+#define COLS512 (8)
+#define COLS1024 (16)
+#define SIZE512 ((ROWS)*(COLS512))
+#define SIZE1024 ((ROWS)*(COLS1024))
+#define ROUNDS512 (10)
+#define ROUNDS1024 (14)
 
 #if LENGTH<=256
-#define COLS COLS512
-#define SIZE SIZE512
-#define ROUNDS ROUNDS512
+#define COLS (COLS512)
+#define SIZE (SIZE512)
+#define ROUNDS (ROUNDS512)
 #else
-#define COLS COLS1024
-#define SIZE SIZE1024
-#define ROUNDS ROUNDS1024
+#define COLS (COLS1024)
+#define SIZE (SIZE1024)
+#define ROUNDS (ROUNDS1024)
 #endif
 
 #define ROTL64(a,n) ((((a)<<(n))|((a)>>(64-(n))))&li_64(ffffffffffffffff))

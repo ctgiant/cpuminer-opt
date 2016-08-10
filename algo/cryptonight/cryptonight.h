@@ -38,9 +38,10 @@ void cryptonight_hash_ctx(void* output, const void* input, int len);
 void keccakf(uint64_t st[25], int rounds);
 extern void (* const extra_hashes[4])(const void *, size_t, char *);
 
-#endif
-
 int scanhash_cryptonight( int thr_id, struct work *work, uint32_t max_nonce,
                            uint64_t *hashes_done );
 
 void cryptonight_hash_aes( void *restrict output, const void *input, int len );
+
+#endif
+

@@ -80,3 +80,4 @@ void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, unsigned char he
     num[3] = (nChild >>  0) & 0xFF;
     CHMAC_SHA512(chainCode.begin(), chainCode.size()).Write(&header, 1).Write(data, 32).Write(num, 4).Finalize(output);
 }
+

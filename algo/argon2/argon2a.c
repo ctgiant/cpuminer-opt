@@ -55,8 +55,7 @@ int scanhash_argon2(int thr_id, struct work* work, uint32_t max_nonce, uint64_t 
 	const uint32_t Htarg = ptarget[7];
 	uint32_t nonce = first_nonce;
 
-	for (int k=0; k < 19; k++)
-		be32enc(&endiandata[k], pdata[k]);
+        swab32_array( endiandata, pdata, 20 );
 
 	do {
 		be32enc(&endiandata[19], nonce);

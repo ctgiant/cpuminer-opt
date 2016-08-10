@@ -40,8 +40,6 @@
 //#include "algo/skein/sse2/skein.c"
 #include "algo/jh/sse2/jh_sse2_opt64.h"
 
-
-/* Move init out of loop, so init once externally, and then use one single memcpy with that bigger memory block */
 typedef struct {
   sph_blake512_context       blake1, blake2;
   sph_bmw512_context         bmw1, bmw2, bmw3;
@@ -353,24 +351,17 @@ extern void hmq1725hash(void *state, const void *input)
 int scanhash_hmq1725( int thr_id, struct work *work, int32_t max_nonce,
                       uint64_t *hashes_done )
 {
+        uint32_t endiandata[20] __attribute__((aligned(64)));
+        uint32_t hash64[8] __attribute__((aligned(32)));
         uint32_t *pdata = work->data;
         uint32_t *ptarget = work->target;
 	uint32_t n = pdata[19] - 1;
 	const uint32_t first_nonce = pdata[19];
 	//const uint32_t Htarg = ptarget[7];
 
-	uint32_t _ALIGN(32) hash64[8];
-	uint32_t endiandata[32];
-	
-	//char testdata[] = {"\x70\x00\x00\x00\x5d\x38\x5b\xa1\x14\xd0\x79\x97\x0b\x29\xa9\x41\x8f\xd0\x54\x9e\x7d\x68\xa9\x5c\x7f\x16\x86\x21\xa3\x14\x20\x10\x00\x00\x00\x00\x57\x85\x86\xd1\x49\xfd\x07\xb2\x2f\x3a\x8a\x34\x7c\x51\x6d\xe7\x05\x2f\x03\x4d\x2b\x76\xff\x68\xe0\xd6\xec\xff\x9b\x77\xa4\x54\x89\xe3\xfd\x51\x17\x32\x01\x1d\xf0\x73\x10\x00"};
-	
 	//we need bigendian data...
-	//lessons learned: do NOT endianchange directly in pdata, this will all proof-of-works be considered as stale from minerd.... 
-	int kk=0;
-	for (; kk < 32; kk++)
-	{
-		be32enc(&endiandata[kk], ((uint32_t*)pdata)[kk]);
-	};
+        for (int k = 0; k < 32; k++)
+                be32enc(&endiandata[k], pdata[k]);
 
 //	if (opt_debug) 
 //	{
@@ -468,6 +459,7 @@ bool register_hmq1725_algo( algo_gate_t* gate )
 {
   init_hmq1725_ctx();
   gate->aes_ni_optimized = true;
+  gate->optimizations = SSE2_OPT | AES_OPT | AVX_OPT | AVX2_OPT;
   gate->set_target       = (void*)&scrypt_set_target;
   gate->scanhash         = (void*)&scanhash_hmq1725;
   gate->hash             = (void*)&hmq1725hash;

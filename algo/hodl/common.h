@@ -9,6 +9,10 @@
 #include "bitcoin-config.h"
 #endif
 
+#if ((defined(_WIN64) || defined(__WINDOWS__)))
+#include "hodl-endian.h"
+#endif
+
 #include <stdint.h>
 
 uint16_t static inline ReadLE16(const unsigned char* ptr)
@@ -62,3 +66,5 @@ void static inline WriteBE64(unsigned char* ptr, uint64_t x)
 }
 
 #endif // BITCOIN_CRYPTO_COMMON_H
+
+//#endif

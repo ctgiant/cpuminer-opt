@@ -63,9 +63,10 @@ int scanhash_blakecoin(int thr_id, struct work *work, uint32_t max_nonce,
 		HTarget = 0x7f;
 
 	// we need big endian data...
-	for (int kk=0; kk < 19; kk++) {
-		be32enc(&endiandata[kk], ((uint32_t*)pdata)[kk]);
-	};
+//        be32enc_array( endiandata, pdata, 19 );
+        for (int kk=0; kk < 19; kk++) 
+                be32enc(&endiandata[kk], ((uint32_t*)pdata)[kk]);
+
 
 #ifdef DEBUG_ALGO
 	applog(LOG_DEBUG,"[%d] Target=%08x %08x", thr_id, ptarget[6], ptarget[7]);
@@ -108,18 +109,6 @@ int64_t blakecoin_get_max64 ()
 {
   return 0x7ffffLL;
 }
-
-/*
-bool register_blakecoin_algo( algo_gate_t* gate )
-{
-  gate->scanhash = (void*)&scanhash_blakecoin;
-  gate->hash     = (void*)&blakecoinhash;
-  gate->hash_alt = (void*)&blakecoinhash;
-  gate->gen_merkle_root = (void*)&SHA256_gen_merkle_root;
-  gate->get_max64 = (void*)&blakecoin_get_max64;
-  return true;
-}
-*/
 
 // vanilla uses default gen merkle root, otherwise identical to blakecoin
 bool register_vanilla_algo( algo_gate_t* gate )

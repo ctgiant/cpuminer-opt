@@ -6,6 +6,12 @@
 #include <stdint.h>
 #include <memory.h>
 
+#define DECRED_NBITS_INDEX 29
+#define DECRED_NTIME_INDEX 34
+#define DECRED_NONCE_INDEX 35
+#define DECRED_XNONCE_INDEX 36
+#define DECRED_DATA_SIZE 192
+
 static __thread sph_blake256_context blake_mid;
 static __thread bool ctx_midstate_done = false;
 
@@ -91,16 +97,14 @@ int scanhash_decred(int thr_id, struct work *work, uint32_t max_nonce, uint64_t 
 
 uint32_t *decred_get_nonceptr( uint32_t *work_data )
 {
-   const int nonce_i = 35;
-   return &work_data[ nonce_i ];
+   return &work_data[ DECRED_NONCE_INDEX ];
 }
 
 void decred_calc_network_diff( struct work* work )
 {
    // sample for diff 43.281 : 1c05ea29
    // todo: endian reversed on longpoll could be zr5 specific...
-   const int nbits_i;
-   uint32_t nbits = work->data[ nbits_i ];
+   uint32_t nbits = work->data[ DECRED_NBITS_INDEX ];
    uint32_t bits = ( nbits & 0xffffff );
    int16_t shift = ( swab32(nbits) & 0xff ); // 0x1c = 28
    int m;
@@ -119,9 +123,8 @@ void decred_calc_network_diff( struct work* work )
 
 void decred_decode_extradata( struct work* work, uint64_t* net_blocks )
 {
-   const int xnonce_i = 36;
    // some random extradata to make the work unique
-   work->data[ xnonce_i ] = (rand()*4);
+   work->data[ DECRED_XNONCE_INDEX ] = (rand()*4);
    work->height = work->data[32];
    if (!have_longpoll && work->height > *net_blocks + 1)
    {
@@ -143,17 +146,15 @@ void decred_decode_extradata( struct work* work, uint64_t* net_blocks )
 void decred_be_build_stratum_request( char *req, struct work *work,
                                       struct stratum_ctx *sctx )
 {
-   const int ntime_i  = 34;
-   const int xnonce_i = 36;
    unsigned char *xnonce2str;
    uint32_t ntime, nonce;
    char ntimestr[9], noncestr[9];
 
-   be32enc( &ntime, work->data[ ntime_i ] );
-   be32enc( &nonce, *( algo_gate.get_nonceptr( work->data ) ) );
+   be32enc( &ntime, work->data[ DECRED_NTIME_INDEX ] );
+   be32enc( &nonce, work->data[ DECRED_NONCE_INDEX ] );
    bin2hex( ntimestr, (char*)(&ntime), sizeof(uint32_t) );
    bin2hex( noncestr, (char*)(&nonce), sizeof(uint32_t) );
-   xnonce2str = abin2hex( (char*)( &work->data[ xnonce_i ] ),
+   xnonce2str = abin2hex( (char*)( &work->data[ DECRED_XNONCE_INDEX ] ),
                                      sctx->xnonce1_size );
    snprintf( req, JSON_BUF_LEN,
         "{\"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"], \"id\":4}",
@@ -176,9 +177,7 @@ void decred_gen_merkle_root( char* merkle_root, struct stratum_ctx* sctx )
 
 void decred_build_extraheader( struct work* work, struct stratum_ctx* sctx )
 {
-   const int xnonce_i = 36;
    uint32_t* extradata = (uint32_t*) sctx->xnonce1;
-
    int i;
    for ( i = 0; i < 8; i++ ) // prevhash
       work->data[1 + i] = swab32( work->data[1 + i] );
@@ -188,8 +187,8 @@ void decred_build_extraheader( struct work* work, struct stratum_ctx* sctx )
       work->data[17 + i] = decred_extraheader[i];
    // extradata
    for ( i = 0; i < sctx->xnonce1_size/4; i++ )
-      work->data[xnonce_i + i] = extradata[i];
-   for ( i = xnonce_i + sctx->xnonce1_size/4; i < 45; i++ )
+      work->data[ DECRED_XNONCE_INDEX + i ] = extradata[i];
+   for ( i = DECRED_XNONCE_INDEX + sctx->xnonce1_size/4; i < 45; i++ )
       work->data[i] = 0;
    work->data[37] = (rand()*4) << 8;
    sctx->bloc_height = work->data[32];
@@ -203,11 +202,9 @@ bool decred_prevent_dupes( struct work* work, struct stratum_ctx* stratum,
    if ( have_stratum && strcmp(stratum->job.job_id, work->job_id)  )
       // need to regen g_work..
       return true;
- 
    // extradata: prevent duplicates
-   const int xnonce_i = 36;
-   work->data[ xnonce_i   ] += 1;
-   work->data[ xnonce_i+1 ] |= thr_id;
+   work->data[ DECRED_XNONCE_INDEX     ] += 1;
+   work->data[ DECRED_XNONCE_INDEX + 1 ] |= thr_id;
    return false;
 }
 
@@ -224,7 +221,10 @@ bool register_decred_algo( algo_gate_t* gate )
   gate->gen_merkle_root       = (void*)&decred_gen_merkle_root;
   gate->build_extraheader     = (void*)&decred_build_extraheader;
   gate->prevent_dupes         = (void*)&decred_prevent_dupes;
-  gate->work_data_size        = 192;
+  gate->nbits_index           = DECRED_NBITS_INDEX;
+  gate->ntime_index           = DECRED_NTIME_INDEX;
+  gate->nonce_index           = DECRED_NONCE_INDEX;
+  gate->work_data_size        = DECRED_DATA_SIZE;
   allow_mininginfo            = false;
   have_gbt                    = false;
   return true;

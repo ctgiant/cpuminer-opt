@@ -42,6 +42,86 @@ static __inline uint64_t rotr64(const uint64_t w, const unsigned c) {
 #endif
 }
 
+#if defined __AVX2__
+
+// _m256i
+#define  mm256_rotr_64(w,c) _mm256_or_si256(_mm256_srli_epi64(w, c), \
+                                            _mm256_slli_epi64(w, 64 - c))
+
+// Rotate uint64 by one uint64
+// __m256i
+#define mm256_rotl256_1x64(s) _mm256_permute4x64_epi64( s, 0x39 )
+#define mm256_rotr256_1x64(s) _mm256_permute4x64_epi64( s, 0x93 )
+
+// swap hi and lo 128 bits in 256 bit vector
+// _m256i
+#define mm256_swap128(s) _mm256_permute2f128_si256( s, s, 1 )
+
+// void
+#define G_4X64(a,b,c,d) \
+   a = _mm256_add_epi64( a, b ); \
+   d = mm256_rotr_64( _mm256_xor_si256( d, a), 32 ); \
+   c = _mm256_add_epi64( c, d ); \
+   b = mm256_rotr_64( _mm256_xor_si256( b, c ), 24 ); \
+   a = _mm256_add_epi64( a, b ); \
+   d = mm256_rotr_64( _mm256_xor_si256( d, a ), 16 ); \
+   c = _mm256_add_epi64( c, d ); \
+   b = mm256_rotr_64( _mm256_xor_si256( b, c ), 63 );
+
+#elif defined __AVX__
+
+// _m128i
+#define  mm_rotr_64(w,c) _mm_or_si128(_mm_srli_epi64(w, c), \
+                                      _mm_slli_epi64(w, 64 - c))
+
+// swap 128 bit source vectors
+// void
+#define mm128_swap128(s0, s1) s0 = _mm_xor_si128(s0, s1); \
+                              s1 = _mm_xor_si128(s0, s1); \
+                              s0 = _mm_xor_si128(s0, s1);
+ 
+// swap uint64 in source vector
+// __m128i
+#define mm128_swap64(s) _mm_or_si128( _mm_slli_si128( s, 8 ), \
+                                      _mm_srli_si128( s, 8 ) )
+
+// rotate 2 128 bit vectors as one 256 vector by 1 uint64
+//void
+#define mm128_rotl256_1x64(s0, s1) do { \
+   __m128i t; \
+   s0 = mm128_swap64( s0); \
+   s1 = mm128_swap64( s1); \
+   t = _mm_or_si128( _mm_and_si128( s0, _mm_set_epi64x(0ull,0xffffffffffffffffull) ), \
+                     _mm_and_si128( s1, _mm_set_epi64x(0xffffffffffffffffull,0ull) ) ); \
+   s1 = _mm_or_si128( _mm_and_si128( s0, _mm_set_epi64x(0xffffffffffffffffull,0ull) ), \
+                      _mm_and_si128( s1, _mm_set_epi64x(0ull,0xffffffffffffffffull) ) ); \
+   s0 = t; \
+} while(0)
+
+#define mm128_rotr256_1x64(s0, s1) do { \
+   __m128i t; \
+   s0 = mm128_swap64( s0); \
+   s1 = mm128_swap64( s1); \
+   t = _mm_or_si128( _mm_and_si128( s0, _mm_set_epi64x(0xffffffffffffffffull,0ull) ), \
+                        _mm_and_si128( s1, _mm_set_epi64x(0ull,0xffffffffffffffffull) ) ); \
+   s1 = _mm_or_si128( _mm_and_si128( s0, _mm_set_epi64x(0ull,0xffffffffffffffffull) ), \
+                      _mm_and_si128( s1, _mm_set_epi64x(0xffffffffffffffffull,0ull) ) ); \
+   s0 = t; \
+} while(0)
+
+
+#define G_2X64(a,b,c,d) \
+   a = _mm_add_epi64( a, b ); \
+   d = mm_rotr_64( _mm_xor_si128( d, a), 32 ); \
+   c = _mm_add_epi64( c, d ); \
+   b = mm_rotr_64( _mm_xor_si128( b, c ), 24 ); \
+   a = _mm_add_epi64( a, b ); \
+   d = mm_rotr_64( _mm_xor_si128( d, a ), 16 ); \
+   c = _mm_add_epi64( c, d ); \
+   b = mm_rotr_64( _mm_xor_si128( b, c ), 63 );
+
+#endif   // AVX2
+
 /* Blake2b's G function */
 #define G(r,i,a,b,c,d) do { \
 	a = a + b; \
@@ -65,6 +145,7 @@ static __inline uint64_t rotr64(const uint64_t w, const unsigned c) {
 	G(r,5,v[ 1],v[ 6],v[11],v[12]); \
 	G(r,6,v[ 2],v[ 7],v[ 8],v[13]); \
 	G(r,7,v[ 3],v[ 4],v[ 9],v[14]);
+
 
 //---- Housekeeping
 void initState(uint64_t state[/*16*/]);

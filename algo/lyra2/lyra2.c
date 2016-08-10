@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
+#include "compat.h"
 #include "lyra2.h"
 #include "sponge.h"
 
@@ -67,7 +67,7 @@ int LYRA2(void *K, int64_t kLen, const void *pwd, int32_t pwdlen, const void *sa
 	const int64_t BLOCK_LEN = (nCols == 4) ? BLOCK_LEN_BLAKE2_SAFE_INT64 : BLOCK_LEN_BLAKE2_SAFE_BYTES;
 
 	i = (int64_t)ROW_LEN_BYTES * nRows;
-	uint64_t *wholeMatrix = malloc(i);
+	uint64_t _ALIGN(256) *wholeMatrix = malloc(i);
 	if (wholeMatrix == NULL) {
 		return -1;
 	}
@@ -133,7 +133,7 @@ int LYRA2(void *K, int64_t kLen, const void *pwd, int32_t pwdlen, const void *sa
 
 	//======================= Initializing the Sponge State ====================//
 	//Sponge state: 16 uint64_t, BLOCK_LEN_INT64 words of them for the bitrate (b) and the remainder for the capacity (c)
-	uint64_t state[16];
+	uint64_t _ALIGN(256) state[16];
 	initState(state);
 	//==========================================================================/
 

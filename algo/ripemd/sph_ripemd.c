@@ -273,7 +273,7 @@ void
 sph_ripemd_close(void *cc, void *dst)
 {
 	ripemd_close(cc, dst, 4);
-	sph_ripemd_init(cc);
+//	sph_ripemd_init(cc);
 }
 
 /* see sph_ripemd.h */
@@ -527,7 +527,7 @@ void
 sph_ripemd128_close(void *cc, void *dst)
 {
 	ripemd128_close(cc, dst, 4);
-	sph_ripemd128_init(cc);
+//	sph_ripemd128_init(cc);
 }
 
 /* see sph_ripemd.h */
@@ -820,7 +820,7 @@ void
 sph_ripemd160_close(void *cc, void *dst)
 {
 	ripemd160_close(cc, dst, 5);
-	sph_ripemd160_init(cc);
+//	sph_ripemd160_init(cc);
 }
 
 /* see sph_ripemd.h */

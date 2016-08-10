@@ -261,12 +261,14 @@ static void neoscrypt_hmac_init_sha256(sha256_hmac_state *st, const uint8_t *key
     /* h(inner || ...) */
     for(i = 0; i < SCRYPT_HASH_BLOCK_SIZE; i++)
       pad[i] ^= 0x36;
+
     neoscrypt_hash_update_sha256(&st->inner, pad, SCRYPT_HASH_BLOCK_SIZE);
 
     /* outer = (key ^ 0x5c) */
     /* h(outer || ...) */
     for(i = 0; i < SCRYPT_HASH_BLOCK_SIZE; i++)
       pad[i] ^= (0x5c ^ 0x36);
+
     neoscrypt_hash_update_sha256(&st->outer, pad, SCRYPT_HASH_BLOCK_SIZE);
 }
 
@@ -1077,11 +1079,6 @@ int64_t get_neoscrypt_max64()
      else if ( opt_nfactor > 16)
          max64 = 0xF;
      return max64;
-}
-
-void neoscrypt_set_target( struct work* work, double job_diff ) 
-{
- work_set_target( work, job_diff / (65536.0 * opt_diff_factor) );
 }
 
 void neoscrypt_wait_for_diff( struct stratum_ctx *stratum )

@@ -73,6 +73,36 @@
 //  an algo it is not necessary to define a custom function.
 //
 
+// my hack at creating a set data type using bit masks. Set inclusion,
+// exclusion union and intersection operations are provided for convenience. In // some cases it may be desireable to use boolean algebra directly on the
+// data to perfomr set operations. Sets can be represented as single
+// elements, a bitwise OR of multiple elements, a bitwise OR of multiple
+// set variables or constants, or combinations of the above.
+// Examples:
+//
+// my_set = set_element;
+// another_set = my_set | another_set_element;
+
+typedef  uint32_t set_t;
+
+#define EMPTY_SET 0
+#define SSE2_OPT 1
+#define AES_OPT  2
+#define AVX_OPT  4
+#define AVX2_OPT 8
+
+// return set containing all elements from sets a & b
+inline set_t set_union ( set_t a, set_t b ) { return a | b; }
+
+// return set contained common elements from sets a & b
+inline set_t set_intsec ( set_t a, set_t b) { return a & b; }
+
+// all elements in set a are included in set b
+inline bool set_incl ( set_t a, set_t b ) { return (a & b) == a; }
+
+// no elements in set a are included in set b
+inline bool set_excl ( set_t a, set_t b ) { return (a & b) == 0; }
+
 typedef struct
 {
 //migrate to use work instead of pdata & ptarget, see decred for example.
@@ -106,8 +136,13 @@ void ( *resync_threads )          ( struct work* );
 bool ( *do_this_thread )          ( int );
 json_t* (*longpoll_rpc_call)      ( CURL*, int*, char* );
 bool ( *stratum_handle_response ) ( json_t* );
-int  work_data_size;
 bool aes_ni_optimized;
+set_t optimizations;
+int  ntime_index;
+int  nbits_index;
+int  nonce_index;            // use with caution, see warning below
+int  work_data_size;
+int  work_cmp_size;
 
 } algo_gate_t;
 
@@ -123,6 +158,28 @@ bool return_false();
 void *return_null();
 void algo_not_tested();
 void algo_not_implemented();
+
+
+// Warning: algo_gate.nonce_index should only be used in targetted code
+// due to different behaviours by different targets. The JR2 index uses an
+// 8 bit offset while all others user 32 bit offset. c/c++ pointer arithmetic
+// conventions results in different behaviour for pointers with different
+// target sizes requiring customized casting to make it work consistently.
+// Rant mode: yet another thing I hate about c/c++. Array indexes should
+// be scaled, pointer offsets should always be bytes. Noconfusion and no hidden
+// math.
+
+#define STD_NTIME_INDEX 17
+#define STD_NBITS_INDEX 18
+#define STD_NONCE_INDEX 19   // 32 bit offset
+#define STD_WORK_DATA_SIZE 128
+#define STD_WORK_CMP_SIZE 76
+
+#define JR2_NONCE_INDEX 39  // 8 bit offset
+
+// These indexes are only used with JSON RPC2 and are not gated.
+#define JR2_WORK_CMP_INDEX_2 43
+#define JR2_WORK_CMP_SIZE_2 33
 
 // allways returns failure
 int null_scanhash();
@@ -140,15 +197,15 @@ bool jr2_gen_work_now( int thr_id, struct work *work, struct work *g_work );
 uint32_t *std_get_nonceptr( uint32_t *work_data );
 uint32_t *jr2_get_nonceptr( uint32_t *work_data );
 
-void std_init_nonce( struct work* work, struct work* g_work, int thr_id );
-void jr2_init_nonce( struct work* work, struct work* g_work, int thr_id );
+void std_init_nonce( struct work *work, struct work *g_work, int thr_id );
+void jr2_init_nonce( struct work *work, struct work *g_work, int thr_id );
 
 void std_stratum_gen_work( struct stratum_ctx *sctx, struct work *work,
                            int thr_id );
 void jr2_stratum_gen_work( struct stratum_ctx *sctx, struct work *work );
 
-void sha256d_gen_merkle_root( char* merkle_root, struct stratum_ctx* sctx );
-void SHA256_gen_merkle_root ( char* merkle_root, struct stratum_ctx* sctx );
+void sha256d_gen_merkle_root( char *merkle_root, struct stratum_ctx *sctx );
+void SHA256_gen_merkle_root ( char *merkle_root, struct stratum_ctx *sctx );
 
 // pick your favorite or define your own
 int64_t get_max64_0x1fffffLL(); // default
@@ -157,8 +214,8 @@ int64_t get_max64_0x3ffff();
 int64_t get_max64_0x3fffffLL();
 int64_t get_max64_0x1ffff();
 
-void std_set_target   ( struct work* work, double job_diff );
-void scrypt_set_target( struct work* work, double job_diff );
+void std_set_target   ( struct work *work, double job_diff );
+void scrypt_set_target( struct work *work, double job_diff );
 
 bool std_work_decode( const json_t *val, struct work *work );
 bool jr2_work_decode( const json_t *val, struct work *work );
@@ -168,16 +225,16 @@ bool jr2_submit_getwork_result( CURL *curl, struct work *work );
 
 void std_le_build_stratum_request( char *req, struct work *work );
 void std_be_build_stratum_request( char *req, struct work *work );
-void jr2_build_stratum_request   ( char* req, struct work* work );
+void jr2_build_stratum_request   ( char *req, struct work *work );
 
 // default is do_nothing;
 void swab_work_data( struct work *work );
 
-void std_calc_network_diff( struct work* work );
+void std_calc_network_diff( struct work *work );
 
-void std_build_extraheader( struct work* work, struct stratum_ctx* sctx );
+void std_build_extraheader( struct work *work, struct stratum_ctx *sctx );
 
-json_t* std_longpoll_rpc_call( CURL *curl, int *err, char* lp_url );
+json_t* std_longpoll_rpc_call( CURL *curl, int *err, char *lp_url );
 json_t* jr2_longpoll_rpc_call( CURL *curl, int *err );
 
 bool std_stratum_handle_response( json_t *val );

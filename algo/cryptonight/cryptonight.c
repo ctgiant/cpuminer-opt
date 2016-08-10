@@ -169,9 +169,10 @@ typedef struct {
 	oaes_ctx* aes_ctx;
 } cryptonight_ctx;
 
+static __thread cryptonight_ctx ctx;
+
 void cryptonight_hash_ctx(void* output, const void* input, int len)
 {
-   cryptonight_ctx ctx;
 	hash_process(&ctx.state.hs, (const uint8_t*) input, len);
 	ctx.aes_ctx = (oaes_ctx*) oaes_alloc();
 	size_t i, j;
